@@ -188,26 +188,29 @@ jobs:
           test -n "$MAKEROM_BIN"
           chmod +x "$MAKEROM_BIN" || true
           ldd "$MAKEROM_BIN" || true
-          echo "=== FASE 5: 3dstools e exheader ==="
-          rm -rf /tmp/3dstools TomodachiReal.exheader TomodachiReal.cia
-          if ! git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools; then
-            echo "primeiro clone falhou, tentando de novo em 5s..."
-            sleep 5
+          echo "=== FASE 5: exheader - usa o do container ==="
+          ls /opt/devkitpro/tools/bin/ || true
+          ELF2EXHEADER_BIN=$(which elf2exheader || find /opt/devkitpro -name "elf2exheader" -type f | head -1 || true)
+          echo "ELF2EXHEADER_BIN inicial=$ELF2EXHEADER_BIN"
+          if [ -z "$ELF2EXHEADER_BIN" ]; then
+            echo "elf2exheader nao achado no container, tentando compilar 3dstools com autotools..."
             rm -rf /tmp/3dstools
-            git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools
+            if ! git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools; then
+              echo "primeiro clone falhou, tentando de novo em 5s..."
+              sleep 5
+              rm -rf /tmp/3dstools
+              git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools
+            fi
+            ls -R /tmp/3dstools/src || true
+            find /tmp/3dstools -type f | head -50 || true
+            cd /tmp/3dstools
+            ./autogen.sh || true
+            ./configure || true
+            make || true
+            cd -
+            ELF2EXHEADER_BIN=$(find /tmp/3dstools -name "elf2exheader" -type f | head -1 || true)
           fi
-          ls -lh /tmp/3dstools/ || true
-          find /tmp/3dstools -name "*elf2exheader*" || true
-          find /tmp/3dstools -name "Makefile*" -o -name "CMakeLists.txt" || true
-          cat /tmp/3dstools/Makefile | head -80 || true
-          make -C /tmp/3dstools || true
-          ls -lh /tmp/3dstools/ || true
-          find /tmp/3dstools -name "elf2exheader" -type f || true
-          ELF2EXHEADER_BIN=$(find /tmp/3dstools -name "elf2exheader" -type f | head -1)
-          echo "ELF2EXHEADER_BIN=$ELF2EXHEADER_BIN"
-          test -n "$ELF2EXHEADER_BIN" || g++ -std=c++11 -o /tmp/elf2exheader $(find /tmp/3dstools -name "elf2exheader.cpp" | head -1) $(find /tmp/3dstools -name "utils.cpp" | head -1) -I/tmp/3dstools/src || g++ -o /tmp/elf2exheader $(find /tmp/3dstools -name "elf2exheader.cpp" | head -1) -I/tmp/3dstools/src || true
-          ELF2EXHEADER_BIN=$(find /tmp -name "elf2exheader" -type f | head -1)
-          echo "ELF2EXHEADER_BIN2=$ELF2EXHEADER_BIN"
+          echo "ELF2EXHEADER_BIN final=$ELF2EXHEADER_BIN"
           test -n "$ELF2EXHEADER_BIN"
           chmod +x "$ELF2EXHEADER_BIN" || true
           "$ELF2EXHEADER_BIN" --help || true
