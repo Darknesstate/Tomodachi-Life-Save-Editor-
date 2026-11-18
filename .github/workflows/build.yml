@@ -23,10 +23,11 @@ jobs:
           python3 -c "import zlib,struct; w=h=48; raw=b''.join([b'\x00'+b'\xff\x33\x33\xff'*w for _ in range(h)]); 
           def chunk(t,d): c=t+d; return struct.pack('>I',len(d))+c+struct.pack('>I',zlib.crc32(c)&0xffffffff)
           open('icon48.png','wb').write(b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw))+chunk(b'IEND',b''))"
-          smdhtool --create "TomodachiReal" "Editor de Save Tomodachi" "Darknesstate" icon48.png TomodachiReal.smdh || true
-          curl -L -o makerom https://github.com/3DSGuy/Project_CTR/releases/download/v0.18/makerom || wget -O makerom https://github.com/3DSGuy/Project_CTR/releases/download/v0.18/makerom || true
-          chmod +x makerom || true
-          ./makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh || makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh || true
+          smdhtool --create "TomodachiReal" "Editor de Save Tomodachi" "Darknesstate" icon48.png TomodachiReal.smdh
+          git clone --depth 1 https://github.com/3DSGuy/Project_CTR.git /tmp/ctr
+          cd /tmp/ctr/makerom && make -j4 || make
+          cd $GITHUB_WORKSPACE
+          /tmp/ctr/makerom/makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh
           ls -lh *.3dsx *.cia *.smdh || true
 
       - name: Salvar arquivos
