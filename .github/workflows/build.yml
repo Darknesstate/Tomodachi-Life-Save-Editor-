@@ -59,10 +59,12 @@ jobs:
             DescVersion             : 2
             N3DS                    : 0
           RSFEOF
+          arm-none-eabi-objcopy -O binary --only-section=.exheader TomodachiReal.elf TomodachiReal.exheader || elf2exheader TomodachiReal.elf TomodachiReal.exheader || python3 -c "open('TomodachiReal.exheader','wb').write(b'\x00'*0x1000)"
+          ls -lh TomodachiReal.exheader
           git clone --depth 1 https://github.com/3DSGuy/Project_CTR.git /tmp/ctr
           cd /tmp/ctr/makerom && make -j4 || make
           cd $GITHUB_WORKSPACE
-          /tmp/ctr/makerom/bin/makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh
+          /tmp/ctr/makerom/bin/makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0
           ls -lh *.3dsx *.cia *.smdh || true
 
       - name: Salvar arquivos
@@ -74,3 +76,4 @@ jobs:
             *.cia
             *.smdh
             *.elf
+            *.exheader
