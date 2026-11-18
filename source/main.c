@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define SAVE_PATH "sdmc:/3ds/Checkpoint/saves/0x00EC7/Tomodachi Life/main"
 #define BACKUP_PATH "sdmc:/3ds/TomodachiEditor/backup_main_v1.bin"
@@ -103,5 +105,4 @@ int main(int argc, char* argv[]) {
     free(saveData);
     gfxExit();
     return 0;
-}
 }
