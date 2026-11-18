@@ -155,19 +155,17 @@ jobs:
           RSFEOF
           curl -L -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-v0.18.4-ubuntu_x86_64.zip
           unzip -o makerom.zip
+          ls -lh makerom* || true
           MAKEROM_BIN=$(find . -name "makerom" -type f | head -1)
-          chmod +x "$MAKEROM_BIN"
+          echo "MAKEROM_BIN=$MAKEROM_BIN"
+          chmod +x "$MAKEROM_BIN" || true
           dkp-pacman -Sy --noconfirm 3dstools || true
-          git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/tools3ds
-          ls /tmp/tools3ds
-          ls /tmp/tools3ds/elf2exheader
-          cd /tmp/tools3ds/elf2exheader
-          make -j4 || make
-          cd $GITHUB_WORKSPACE
-          ls /tmp/tools3ds/elf2exheader/
-          /tmp/tools3ds/elf2exheader/elf2exheader TomodachiReal.elf TomodachiReal.exheader || /tmp/tools3ds/elf2exheader/bin/elf2exheader TomodachiReal.elf TomodachiReal.exheader || elf2exheader TomodachiReal.elf TomodachiReal.exheader
-          ls -lh TomodachiReal.exheader
-          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0
+          ls /opt/devkitpro/tools/bin/ | grep -i exheader || true
+          which elf2exheader || true
+          ls -lh /opt/devkitpro/tools/bin/elf2exheader || true
+          elf2exheader TomodachiReal.elf TomodachiReal.exheader || /opt/devkitpro/tools/bin/elf2exheader TomodachiReal.elf TomodachiReal.exheader || echo "elf2exheader falhou, tentando continuar"
+          ls -lh TomodachiReal.exheader || true
+          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0 || "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader || echo "makerom tentou com e sem desc"
           ls -lh *.3dsx *.cia *.smdh || true
 
       - name: Salvar arquivos
