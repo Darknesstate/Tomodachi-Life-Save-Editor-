@@ -1,0 +1,26 @@
+BasicInfo:
+  Title: "TomodachiReal"
+  CompanyCode: "00"
+  ProductCode: "CTR-P-TMDR"
+  ContentType: "Application"
+  Logo: "Nintendo"
+TitleInfo:
+  UniqueId: 0xFF3D1
+  Category: "Application"
+CardInfo:
+  MediaSize: 128MB
+  MediaType: "Card"
+Option:
+  UseOnSD: true
+  EnableCrypt: false
+  FreeProductCode: true
+  EnableCompress: false
+AccessControlInfo:
+  UseExtSaveData: true
+  ExtSaveDataId: 0x000FF3D1
+  UseSDMC: true
+  UseSDSaveData: true
+SystemControlInfo:
+  SaveDataSize: 0
+  RemasterVersion: 0
+  StackSize: 0x00040000
