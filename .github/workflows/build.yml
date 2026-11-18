@@ -41,26 +41,64 @@ jobs:
             EnableCrypt             : false
             MediaFootPadding        : false
           AccessControlInfo:
-            ExtSaveDataId           : 0x00000000
-            SystemSaveDataId        : 0x00000000
-            UseOtherUserSaveData    : false
-            OtherUserSaveDataId1    : 0x00000000
-            OtherUserSaveDataId2    : 0x00000000
-            OtherUserSaveDataId3    : 0x00000000
-            AccessibleSaveDataIds   : [0x00000000]
-          SystemControlInfo:
-            SaveDataSize            : 0
-            RemasterVersion         : 0
-            StackSize               : 0x00040000
-            JumpId                  : 0x0000000000000000
-          AccessControlInfo2:
             CoreVersion             : 2
             DescVersion             : 2
-            N3DS                    : 0
+            ReleaseKernelMajor      : "02"
+            ReleaseKernelMinor      : "33"
+            UseExtSaveData          : false
+            FileSystemAccess:
+              - DirectSdmc
+            MemoryType              : Application
+            SystemMode              : 64MB
+            IdealProcessor          : 0
+            AffinityMask            : 1
+            Priority                : 16
+            MaxCpu                  : 0
+            HandleTableSize         : 0x200
+            DisableDebug            : false
+            EnableForceDebug        : false
+            CanWriteSharedPage      : true
+            CanUsePrivilegedPriority : false
+            CanUseNonAlphabetAndNumber : true
+            PermitMainFunctionArgument : true
+            CanShareDeviceMemory    : true
+            RunnableOnSleep         : false
+            SpecialMemoryArrange    : true
+            SystemModeExt           : 124MB
+            CpuSpeed                : 804MHz
+            EnableL2Cache           : true
+            CanAccessCore2          : true
+            IORegisterMapping:
+              - 1ff00000-1ff7ffff
+            MemoryMapping:
+              - 1f000000-1f5fffff:r
+            ServiceAccessControl:
+              - cfg:u
+              - fs:USER
+              - gsp::Gpu
+              - hid:USER
+              - APT:U
+              - ac:u
+              - am:net
+              - boss:U
+              - cam:u
+              - cecd:u
+              - frd:u
+              - http:C
+              - ldr:ro
+              - mic:u
+              - ndm:u
+              - ptm:u
+              - soc:U
+              - ssl:C
+              - y2r:u
+          SystemControlInfo:
+            SaveDataSize            : 0K
+            RemasterVersion         : 0
+            StackSize               : 0x40000
           RSFEOF
           elf2exheader TomodachiReal.elf TomodachiReal.exheader || arm-none-eabi-objcopy -O binary --only-section=.exheader TomodachiReal.elf TomodachiReal.exheader || python3 -c "open('TomodachiReal.exheader','wb').write(b'\x00'*0x1000)"
-          python3 -c "d=open('TomodachiReal.exheader','rb').read(); open('TomodachiReal.exheader','wb').write(d.ljust(0x1000,b'\x00')[:0x1000]); print('exheader size', len(open('TomodachiReal.exheader','rb').read()))"
-          ls -lh TomodachiReal.exheader
+          python3 -c "d=open('TomodachiReal.exheader','rb').read(); open('TomodachiReal.exheader','wb').write(d.ljust(0x1000,b'\x00')[:0x1000])"
           git clone --depth 1 https://github.com/3DSGuy/Project_CTR.git /tmp/ctr
           cd /tmp/ctr/makerom && make -j4 || make
           cd $GITHUB_WORKSPACE
