@@ -19,12 +19,14 @@ jobs:
           export DEVKITPRO=/opt/devkitpro
           export DEVKITARM=/opt/devkitpro/devkitARM
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
+          echo "=== FASE 1: ELF e 3DSX ==="
           arm-none-eabi-gcc -g -Wall -O2 -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -DARM11 -D_3DS -I$DEVKITPRO/libctru/include source/main.c -o TomodachiReal.elf -specs=3dsx.specs -L$DEVKITPRO/libctru/lib -lctru -lm
           ls -lh TomodachiReal.elf || true
           test -s TomodachiReal.elf
           3dsxtool TomodachiReal.elf TomodachiReal.3dsx
           ls -lh TomodachiReal.3dsx || true
           test -s TomodachiReal.3dsx
+          echo "=== FASE 2: icone SMDH ==="
           python3 << 'PYEOF'
           import zlib, struct
           w = h = 48
@@ -36,6 +38,8 @@ jobs:
           PYEOF
           ls -lh icon48.png || true
           smdhtool --create "TomodachiReal" "Editor de Save Tomodachi" "Darknesstate" icon48.png TomodachiReal.smdh
+          ls -lh TomodachiReal.smdh || true
+          echo "=== FASE 3: RSF ==="
           cat > TomodachiReal.rsf << 'RSFEOF'
           BasicInfo:
             Title                   : "TomodachiReal"
@@ -163,20 +167,35 @@ jobs:
             RemasterVersion         : 0
             StackSize               : 0x40000
           RSFEOF
-          curl -L --retry 3 -f -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-v0.18.4-ubuntu_x86_64.zip
+          echo "=== FASE 4: makerom ==="
+          rm -f makerom.zip makerom
+          if ! curl -L --retry 3 -f -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-v0.18.4-ubuntu_x86_64.zip; then
+            echo "primeiro link do makerom falhou, tentando segundo nome..."
+            curl -L --retry 3 -f -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-ubuntu_x86_64
+          fi
           ls -lh makerom.zip || true
           file makerom.zip || true
-          unzip -l makerom.zip || true
-          unzip -o makerom.zip
+          if file makerom.zip | grep -q "Zip archive"; then
+            echo "makerom veio como zip, descompactando..."
+            unzip -l makerom.zip || true
+            unzip -o makerom.zip
+          else
+            echo "makerom veio como binario direto, usando como makerom..."
+            cp makerom.zip makerom
+          fi
           MAKEROM_BIN=$(find . -name "makerom" -type f | head -1)
           echo "MAKEROM_BIN=$MAKEROM_BIN"
           test -n "$MAKEROM_BIN"
           chmod +x "$MAKEROM_BIN" || true
           ldd "$MAKEROM_BIN" || true
-          apt-get update || true
-          apt-get install -y libssl1.0.0 || apt-get install -y libssl1.1 || true
+          echo "=== FASE 5: 3dstools e exheader ==="
           rm -rf /tmp/3dstools TomodachiReal.exheader TomodachiReal.cia
-          git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools || sleep 5 && git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools
+          if ! git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools; then
+            echo "primeiro clone falhou, tentando de novo em 5s..."
+            sleep 5
+            rm -rf /tmp/3dstools
+            git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools
+          fi
           ls -lh /tmp/3dstools/ || true
           find /tmp/3dstools -name "*elf2exheader*" || true
           find /tmp/3dstools -name "Makefile*" -o -name "CMakeLists.txt" || true
@@ -200,7 +219,8 @@ jobs:
           file TomodachiReal.exheader || true
           test -s TomodachiReal.exheader
           python3 -c "data=open('TomodachiReal.exheader','rb').read(); nz=sum(1 for b in data if b!=0); print('exheader size', len(data), 'bytes nao-zero', nz); import sys; sys.exit(0 if nz>10 else 1)"
-          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc TomodachiReal:0
+          echo "=== FASE 6: CIA ==="
+          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0
           ls -lh *.3dsx *.cia *.smdh || true
           test -s TomodachiReal.cia
           stat -c%s TomodachiReal.cia
