@@ -19,15 +19,50 @@ jobs:
           export DEVKITARM=/opt/devkitpro/devkitARM
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
           arm-none-eabi-gcc -g -Wall -O2 -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -DARM11 -D_3DS -I$DEVKITPRO/libctru/include source/main.c -o TomodachiReal.elf -specs=3dsx.specs -L$DEVKITPRO/libctru/lib -lctru -lm
-          3dsxtool TomodachiReal.elf TomodachiReal.3dsx --exheader=TomodachiReal.exheader
+          3dsxtool TomodachiReal.elf TomodachiReal.3dsx
           python3 -c "import zlib,struct; w=h=48; raw=b''.join([b'\x00'+b'\xff\x33\x33\xff'*w for _ in range(h)]); 
           def chunk(t,d): c=t+d; return struct.pack('>I',len(d))+c+struct.pack('>I',zlib.crc32(c)&0xffffffff)
           open('icon48.png','wb').write(b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw))+chunk(b'IEND',b''))"
           smdhtool --create "TomodachiReal" "Editor de Save Tomodachi" "Darknesstate" icon48.png TomodachiReal.smdh
+          cat > TomodachiReal.rsf << 'RSFEOF'
+          BasicInfo:
+            Title                   : "TomodachiReal"
+            CompanyCode             : "00"
+            ProductCode             : "CTR-P-TMDR"
+            ContentType             : Application
+            Logo                    : Nintendo
+          TitleInfo:
+            UniqueId                : 0x00000000
+            Category                : Application
+          Option:
+            UseOnSD                 : true
+            EnableCompress          : true
+            FreeProductCode         : true
+            EnableCrypt             : false
+            MediaFootPadding        : false
+            MediaPlatformIndex      : 0
+          AccessControlInfo:
+            ExtSaveDataId           : 0x00000000
+            SystemSaveDataId        : 0x00000000
+            UseOtherUserSaveData    : false
+            OtherUserSaveDataId1    : 0x00000000
+            OtherUserSaveDataId2    : 0x00000000
+            OtherUserSaveDataId3    : 0x00000000
+            AccessibleSaveDataIds   : [0x00000000]
+          SystemControlInfo:
+            SaveDataSize            : 0
+            RemasterVersion         : 0
+            StackSize               : 0x00040000
+            JumpId                  : 0x0000000000000000
+          AccessControlInfo2:
+            CoreVersion             : 2
+            DescVersion             : 2
+            N3DS                    : 0
+          RSFEOF
           git clone --depth 1 https://github.com/3DSGuy/Project_CTR.git /tmp/ctr
           cd /tmp/ctr/makerom && make -j4 || make
           cd $GITHUB_WORKSPACE
-          /tmp/ctr/makerom/bin/makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0
+          /tmp/ctr/makerom/bin/makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh
           ls -lh *.3dsx *.cia *.smdh || true
 
       - name: Salvar arquivos
@@ -39,4 +74,3 @@ jobs:
             *.cia
             *.smdh
             *.elf
-            *.exheader
