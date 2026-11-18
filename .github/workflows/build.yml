@@ -26,19 +26,57 @@ jobs:
           3dsxtool TomodachiReal.elf TomodachiReal.3dsx
           ls -lh TomodachiReal.3dsx || true
           test -s TomodachiReal.3dsx
-          echo "=== FASE 2: icone SMDH ==="
+          echo "=== FASE 1b: strip para makerom ==="
+          cp TomodachiReal.elf TomodachiReal.elf.orig
+          arm-none-eabi-strip TomodachiReal.elf
+          ls -lh TomodachiReal.elf TomodachiReal.elf.orig || true
+          echo "=== FASE 2: icone SMDH + banner + audio silencioso ==="
           python3 << 'PYEOF'
-          import zlib, struct
+          import zlib, struct, wave, io
+          # Icone 48x48
           w = h = 48
           raw = b''.join([b'\x00' + b'\xff\x33\x33\xff' * w for _ in range(h)])
           def chunk(t, d):
               c = t + d
               return struct.pack('>I', len(d)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
           open('icon48.png', 'wb').write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b''))
+          # Banner 256x128
+          w2 = 256
+          h2 = 128
+          raw2 = b''.join([b'\x00' + b'\x33\x33\xff\xff' * w2 for _ in range(h2)])
+          open('banner.png', 'wb').write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w2, h2, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw2)) + chunk(b'IEND', b''))
+          # WAV silencioso 1s, 22050Hz, mono, 16-bit - bannertool exige -a
+          with wave.open('silence.wav', 'wb') as wf:
+              wf.setnchannels(1)
+              wf.setsampwidth(2)
+              wf.setframerate(22050)
+              wf.writeframes(b'\x00\x00' * 22050)
+          print('icon48.png, banner.png, silence.wav criados')
           PYEOF
-          ls -lh icon48.png || true
+          ls -lh icon48.png banner.png silence.wav || true
           smdhtool --create "TomodachiReal" "Editor de Save Tomodachi" "Darknesstate" icon48.png TomodachiReal.smdh
           ls -lh TomodachiReal.smdh || true
+          echo "=== FASE 2b: baixar bannertool (nao vem no container) ==="
+          if which bannertool; then
+            echo "bannertool ja existe"
+            BANNERTOOL_BIN=$(which bannertool)
+          else
+            echo "baixando bannertool..."
+            rm -f bannertool.zip
+            curl -L --retry 3 -f -o bannertool.zip https://github.com/Epicpkmn11/bannertool/releases/download/1.2.2/bannertool.zip || curl -L --retry 3 -f -o bannertool.zip https://github.com/Epicpkmn11/bannertool/releases/download/1.2.1/bannertool.zip || curl -L --retry 3 -f -o bannertool.zip https://github.com/Steveice10/bannertool/releases/download/1.2.0/bannertool.zip || true
+            ls -lh bannertool.zip || true
+            unzip -o bannertool.zip || true
+            find . -name "bannertool*" -type f | head -20
+            BANNERTOOL_BIN=$(find . -name "bannertool" -type f | head -1)
+            echo "BANNERTOOL_BIN=$BANNERTOOL_BIN"
+            test -n "$BANNERTOOL_BIN"
+            chmod +x "$BANNERTOOL_BIN" || true
+            ls -lh "$BANNERTOOL_BIN" || true
+          fi
+          echo "criando banner.bnr com audio..."
+          "$BANNERTOOL_BIN" makebanner -i banner.png -a silence.wav -o TomodachiReal.bnr
+          ls -lh TomodachiReal.bnr || true
+          test -s TomodachiReal.bnr
           echo "=== FASE 3: RSF ==="
           cat > TomodachiReal.rsf << 'RSFEOF'
           BasicInfo:
@@ -48,7 +86,7 @@ jobs:
             ContentType             : Application
             Logo                    : Nintendo
           TitleInfo:
-            UniqueId                : 0x0004000000D1D000
+            UniqueId                : 0x00D1D0
             Category                : Application
           Option:
             UseOnSD                 : true
@@ -186,9 +224,9 @@ jobs:
           test -n "$MAKEROM_BIN"
           chmod +x "$MAKEROM_BIN" || true
           ls -lh "$MAKEROM_BIN" || true
-          echo "=== FASE 5: CIA direto do ELF, sem exheader ==="
-          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -elf TomodachiReal.elf -rsf TomodachiReal.rsf -target t -exefslogo -icon TomodachiReal.smdh -desc app:0
-          ls -lh *.3dsx *.cia *.smdh || true
+          echo "=== FASE 5: CIA direto do ELF stripado, com banner, sem -desc ==="
+          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -elf TomodachiReal.elf -rsf TomodachiReal.rsf -target t -exefslogo -icon TomodachiReal.smdh -banner TomodachiReal.bnr
+          ls -lh *.3dsx *.cia *.smdh *.bnr || true
           test -s TomodachiReal.cia
           stat -c%s TomodachiReal.cia
 
@@ -200,4 +238,5 @@ jobs:
             *.3dsx
             *.cia
             *.smdh
+            *.bnr
             *.elf
