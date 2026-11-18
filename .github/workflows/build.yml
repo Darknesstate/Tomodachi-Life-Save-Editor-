@@ -13,20 +13,30 @@ jobs:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      - name: Compilar direto sem Makefile
+      - name: Compilar .3dsx e .cia
         run: |
           export DEVKITPRO=/opt/devkitpro
           export DEVKITARM=/opt/devkitpro/devkitARM
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
-          arm-none-eabi-gcc -g -Wall -O2 -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -DARM11 -D_3DS -I$DEVKITPRO/libctru/include source/main.c -o TomodachiReal.elf -specs=3dsx.specs -L$DEVKITPRO/libctru/lib -lctru -lm
-          3dsxtool TomodachiReal.elf TomodachiReal.3dsx --smdh=TomodachiReal.smdh || 3dsxtool TomodachiReal.elf TomodachiReal.3dsx
-          ls -lh *.3dsx
+          arm-none-eabi-gcc -g -Wall -O2 -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -DARM11 -D_3DS -I$DEVKITPRO/libctru/include -I$DEVKITPRO/libctru/include source/main.c -o TomodachiReal.elf -specs=3dsx.specs -L$DEVKITPRO/libctru/lib -lctru -lm
+          3dsxtool TomodachiReal.elf TomodachiReal.3dsx
+          apt-get update -qq && apt-get install -y -qq wget imagemagick unzip > /dev/null 2>&1 || true
+          convert icon.png -resize 48x48! icon48.png || cp icon.png icon48.png
+          convert banner.png -resize 256x128! banner256.png || cp banner.png banner256.png
+          wget -q https://github.com/Steveice10/bannertool/releases/download/1.2.0/bannertool.zip -O bannertool.zip || true
+          unzip -o bannertool.zip > /dev/null 2>&1 || true
+          chmod +x bannertool || true
+          ./bannertool makesmdh -s "TomodachiReal" -l "Editor de Save Tomodachi" -p "Darknesstate" -i icon48.png -o TomodachiReal.smdh || 3dsxtool TomodachiReal.elf TomodachiReal.3dsx --smdh=TomodachiReal.smdh
+          ./bannertool makebanner -i banner256.png -o TomodachiReal.bnr || echo "banner falhou"
+          makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -banner TomodachiReal.bnr || makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh
+          ls -lh *.3dsx *.cia || true
 
-      - name: Salvar .3dsx
+      - name: Salvar arquivos
         uses: actions/upload-artifact@v4
         with:
-          name: TomodachiReal-3dsx
+          name: TomodachiReal-cia
           path: |
             *.3dsx
+            *.cia
             *.smdh
             *.elf
