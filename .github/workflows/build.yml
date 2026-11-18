@@ -156,7 +156,9 @@ jobs:
           unzip -o makerom.zip
           MAKEROM_BIN=$(find . -name "makerom" -type f | head -1)
           chmod +x "$MAKEROM_BIN"
-          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh
+          "$MAKEROM_BIN" -f exheader -o TomodachiReal.exheader -rsf TomodachiReal.rsf -target t -desc app:0
+          ls -lh TomodachiReal.exheader
+          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0
           ls -lh *.3dsx *.cia *.smdh || true
 
       - name: Salvar arquivos
@@ -168,3 +170,4 @@ jobs:
             *.cia
             *.smdh
             *.elf
+            *.exheader
