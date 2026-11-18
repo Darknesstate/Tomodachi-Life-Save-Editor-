@@ -188,42 +188,8 @@ jobs:
           test -n "$MAKEROM_BIN"
           chmod +x "$MAKEROM_BIN" || true
           ldd "$MAKEROM_BIN" || true
-          echo "=== FASE 5: exheader - usa o do container ==="
-          ls /opt/devkitpro/tools/bin/ || true
-          ELF2EXHEADER_BIN=$(which elf2exheader || find /opt/devkitpro -name "elf2exheader" -type f | head -1 || true)
-          echo "ELF2EXHEADER_BIN inicial=$ELF2EXHEADER_BIN"
-          if [ -z "$ELF2EXHEADER_BIN" ]; then
-            echo "elf2exheader nao achado no container, tentando compilar 3dstools com autotools..."
-            rm -rf /tmp/3dstools
-            if ! git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools; then
-              echo "primeiro clone falhou, tentando de novo em 5s..."
-              sleep 5
-              rm -rf /tmp/3dstools
-              git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools
-            fi
-            ls -R /tmp/3dstools/src || true
-            find /tmp/3dstools -type f | head -50 || true
-            cd /tmp/3dstools
-            ./autogen.sh || true
-            ./configure || true
-            make || true
-            cd -
-            ELF2EXHEADER_BIN=$(find /tmp/3dstools -name "elf2exheader" -type f | head -1 || true)
-          fi
-          echo "ELF2EXHEADER_BIN final=$ELF2EXHEADER_BIN"
-          test -n "$ELF2EXHEADER_BIN"
-          chmod +x "$ELF2EXHEADER_BIN" || true
-          "$ELF2EXHEADER_BIN" --help || true
-          rm -f TomodachiReal.exheader
-          "$ELF2EXHEADER_BIN" TomodachiReal.elf TomodachiReal.exheader || rm -f TomodachiReal.exheader
-          test -s TomodachiReal.exheader || "$ELF2EXHEADER_BIN" TomodachiReal.elf TomodachiReal.rsf TomodachiReal.exheader || rm -f TomodachiReal.exheader
-          test -s TomodachiReal.exheader || "$ELF2EXHEADER_BIN" -a TomodachiReal.rsf TomodachiReal.elf TomodachiReal.exheader
-          ls -lh TomodachiReal.exheader || true
-          file TomodachiReal.exheader || true
-          test -s TomodachiReal.exheader
-          python3 -c "data=open('TomodachiReal.exheader','rb').read(); nz=sum(1 for b in data if b!=0); print('exheader size', len(data), 'bytes nao-zero', nz); import sys; sys.exit(0 if nz>10 else 1)"
-          echo "=== FASE 6: CIA ==="
-          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0
+          echo "=== FASE 5: CIA direto do ELF, sem exheader ==="
+          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -elf TomodachiReal.elf -rsf TomodachiReal.rsf -target t -exefslogo -icon TomodachiReal.smdh -desc app:0
           ls -lh *.3dsx *.cia *.smdh || true
           test -s TomodachiReal.cia
           stat -c%s TomodachiReal.cia
