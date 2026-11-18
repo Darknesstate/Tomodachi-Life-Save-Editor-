@@ -156,7 +156,13 @@ jobs:
           unzip -o makerom.zip
           MAKEROM_BIN=$(find . -name "makerom" -type f | head -1)
           chmod +x "$MAKEROM_BIN"
-          "$MAKEROM_BIN" -f exheader -o TomodachiReal.exheader -rsf TomodachiReal.rsf -target t -desc app:0
+          git clone --depth 1 https://github.com/3DSGuy/Project_CTR.git /tmp/ctr
+          cd /tmp/ctr/elf2exheader && make -j4 || make
+          cd $GITHUB_WORKSPACE
+          ELF2EXHEADER_BIN=$(find /tmp/ctr -name "elf2exheader" -type f | head -1)
+          echo "Usando $ELF2EXHEADER_BIN"
+          chmod +x "$ELF2EXHEADER_BIN"
+          "$ELF2EXHEADER_BIN" TomodachiReal.elf TomodachiReal.exheader
           ls -lh TomodachiReal.exheader
           "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0
           ls -lh *.3dsx *.cia *.smdh || true
