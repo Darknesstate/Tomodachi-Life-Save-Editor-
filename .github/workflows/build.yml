@@ -41,7 +41,8 @@ jobs:
             EnableCrypt             : false
             MediaFootPadding        : false
           RSFEOF
-          arm-none-eabi-objcopy -O binary --only-section=.exheader TomodachiReal.elf TomodachiReal.exheader || elf2exheader TomodachiReal.elf TomodachiReal.exheader || python3 -c "open('TomodachiReal.exheader','wb').write(b'\x00'*0x1000)"
+          elf2exheader TomodachiReal.elf TomodachiReal.exheader || arm-none-eabi-objcopy -O binary --only-section=.exheader TomodachiReal.elf TomodachiReal.exheader || python3 -c "open('TomodachiReal.exheader','wb').write(b'\x00'*0x1000)"
+          python3 -c "d=open('TomodachiReal.exheader','rb').read(); open('TomodachiReal.exheader','wb').write(d.ljust(0x1000,b'\x00')[:0x1000]); print('exheader size', len(open('TomodachiReal.exheader','rb').read()))"
           ls -lh TomodachiReal.exheader
           git clone --depth 1 https://github.com/3DSGuy/Project_CTR.git /tmp/ctr
           cd /tmp/ctr/makerom && make -j4 || make
