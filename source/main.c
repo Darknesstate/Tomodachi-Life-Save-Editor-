@@ -98,4 +98,4 @@ int main(int argc, char* argv[]) {
     if (!carregarSave()) {
         printf("Save nao achado.\n");
         while (aptMainLoop()) { hidScanInput(); if (hidKeysDown() & KEY_START) break; gfxSwapBuffers(); gspWaitForVBlank(); }
-        gfxExit(); return
+        gfxExit(); return 0;
