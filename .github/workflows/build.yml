@@ -40,6 +40,23 @@ jobs:
             FreeProductCode         : true
             EnableCrypt             : false
             MediaFootPadding        : false
+          AccessControlInfo:
+            ExtSaveDataId           : 0x00000000
+            SystemSaveDataId        : 0x00000000
+            UseOtherUserSaveData    : false
+            OtherUserSaveDataId1    : 0x00000000
+            OtherUserSaveDataId2    : 0x00000000
+            OtherUserSaveDataId3    : 0x00000000
+            AccessibleSaveDataIds   : [0x00000000]
+          SystemControlInfo:
+            SaveDataSize            : 0
+            RemasterVersion         : 0
+            StackSize               : 0x00040000
+            JumpId                  : 0x0000000000000000
+          AccessControlInfo2:
+            CoreVersion             : 2
+            DescVersion             : 2
+            N3DS                    : 0
           RSFEOF
           elf2exheader TomodachiReal.elf TomodachiReal.exheader || arm-none-eabi-objcopy -O binary --only-section=.exheader TomodachiReal.elf TomodachiReal.exheader || python3 -c "open('TomodachiReal.exheader','wb').write(b'\x00'*0x1000)"
           python3 -c "d=open('TomodachiReal.exheader','rb').read(); open('TomodachiReal.exheader','wb').write(d.ljust(0x1000,b'\x00')[:0x1000]); print('exheader size', len(open('TomodachiReal.exheader','rb').read()))"
