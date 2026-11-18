@@ -13,8 +13,14 @@ jobs:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      - name: Compilar
-        run: make
+      - name: Compilar direto sem Makefile
+        run: |
+          export DEVKITPRO=/opt/devkitpro
+          export DEVKITARM=/opt/devkitpro/devkitARM
+          export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
+          arm-none-eabi-gcc -g -Wall -O2 -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -DARM11 -D_3DS -I$DEVKITPRO/libctru/include source/main.c -o TomodachiReal.elf -specs=3dsx.specs -L$DEVKITPRO/libctru/lib -lctru -lm
+          3dsxtool TomodachiReal.elf TomodachiReal.3dsx --smdh=TomodachiReal.smdh || 3dsxtool TomodachiReal.elf TomodachiReal.3dsx
+          ls -lh *.3dsx
 
       - name: Salvar .3dsx
         uses: actions/upload-artifact@v4
