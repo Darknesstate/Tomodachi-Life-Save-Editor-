@@ -20,8 +20,14 @@ jobs:
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
           arm-none-eabi-gcc -g -Wall -O2 -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -DARM11 -D_3DS -I$DEVKITPRO/libctru/include source/main.c -o TomodachiReal.elf -specs=3dsx.specs -L$DEVKITPRO/libctru/lib -lctru -lm
           3dsxtool TomodachiReal.elf TomodachiReal.3dsx
-          3dsxtool TomodachiReal.elf TomodachiReal.cia --cia
-          ls -lh *.3dsx *.cia || true
+          python3 -c "import zlib,struct; w=h=48; raw=b''.join([b'\x00'+b'\xff\x33\x33\xff'*w for _ in range(h)]); 
+          def chunk(t,d): c=t+d; return struct.pack('>I',len(d))+c+struct.pack('>I',zlib.crc32(c)&0xffffffff)
+          open('icon48.png','wb').write(b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw))+chunk(b'IEND',b''))"
+          smdhtool --create "TomodachiReal" "Editor de Save Tomodachi" "Darknesstate" icon48.png TomodachiReal.smdh || true
+          curl -L -o makerom https://github.com/3DSGuy/Project_CTR/releases/download/v0.18/makerom || wget -O makerom https://github.com/3DSGuy/Project_CTR/releases/download/v0.18/makerom || true
+          chmod +x makerom || true
+          ./makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh || makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh || true
+          ls -lh *.3dsx *.cia *.smdh || true
 
       - name: Salvar arquivos
         uses: actions/upload-artifact@v4
@@ -30,4 +36,5 @@ jobs:
           path: |
             *.3dsx
             *.cia
+            *.smdh
             *.elf
