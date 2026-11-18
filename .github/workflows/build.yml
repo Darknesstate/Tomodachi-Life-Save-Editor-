@@ -18,12 +18,10 @@ jobs:
           export DEVKITPRO=/opt/devkitpro
           export DEVKITARM=/opt/devkitpro/devkitARM
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$DEVKITPRO/pacman/bin:$PATH
-          pacman -Sy --noconfirm 3dstools || /opt/devkitpro/pacman/bin/pacman -Sy --noconfirm 3dstools || true
+          pacman -Sy --noconfirm 3dstools || true
           arm-none-eabi-gcc -g -Wall -O2 -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -DARM11 -D_3DS -I$DEVKITPRO/libctru/include source/main.c -o TomodachiReal.elf -specs=3dsx.specs -L$DEVKITPRO/libctru/lib -lctru -lm
-          3dsxtool TomodachiReal.elf TomodachiReal.3dsx
-          python3 -c "from PIL import Image; im=Image.open('icon.png').convert('RGBA'); im.thumbnail((48,48)); im.save('icon48.png')" || cp icon.png icon48.png
-          smdhtool --create "TomodachiReal" "Editor de Save Tomodachi" "Darknesstate" icon48.png TomodachiReal.smdh || 3dsxtool TomodachiReal.elf TomodachiReal.3dsx --smdh=TomodachiReal.smdh
-          makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh
+          3dsxtool TomodachiReal.elf TomodachiReal.3dsx --smdh=TomodachiReal.smdh
+          3dsxtool TomodachiReal.elf TomodachiReal.cia --cia --smdh=TomodachiReal.smdh
           ls -lh *.3dsx *.cia || true
 
       - name: Salvar arquivos
