@@ -23,7 +23,7 @@ jobs:
           arm-none-eabi-gcc -g -Wall -O2 -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -DARM11 -D_3DS -I$DEVKITPRO/libctru/include source/main.c -o TomodachiReal.elf -specs=3dsx.specs -L$DEVKITPRO/libctru/lib -lctru -lm
           ls -lh TomodachiReal.elf || true
           test -s TomodachiReal.elf
-          echo "=== FASE 2: icone e banner do repo + SMDH nome certo ==="
+          echo "=== FASE 2: icone e banner - CORRIGIDO ==="
           python3 -m pip install --quiet Pillow || pip install --quiet Pillow || true
           python3 << 'PYEOF'
           import zlib, struct, os
@@ -39,6 +39,7 @@ jobs:
           def make_dummy(path, w, h, color):
               raw = b''.join([b'\x00' + color * w for _ in range(h)])
               open(path, 'wb').write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b''))
+          # Icone - se falhar, gera dummy valido
           icon_ok = False
           if os.path.exists("icon.png") and has_pil:
               try:
@@ -51,6 +52,7 @@ jobs:
           if not icon_ok:
               make_dummy("icon48.png", 48, 48, b'\xff\x33\x33\xff')
               print("icon48.png placeholder gerado")
+          # Banner - CORRIGIDO: se seu banner.png nao for PNG valido, NAO mantem, gera dummy valido
           banner_ok = False
           if os.path.exists("banner.png") and has_pil:
               try:
@@ -60,13 +62,10 @@ jobs:
                   print("banner.png do repo usado, redimensionado 256x128")
                   banner_ok = True
               except Exception as e:
-                  print(f"falha banner.png repo: {e}")
+                  print(f"falha banner.png repo, gerando dummy: {e}")
           if not banner_ok:
-              if not os.path.exists("banner.png"):
-                  make_dummy("banner.png", 256, 128, b'\x33\x33\xff\xff')
-                  print("banner.png placeholder gerado")
-              else:
-                  print("mantendo banner.png do repo como esta")
+              make_dummy("banner.png", 256, 128, b'\x33\x33\xff\xff')
+              print("banner.png dummy valido gerado - seu banner original nao era PNG p/ bannertool")
           import wave
           with wave.open('silence.wav', 'wb') as wf:
               wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(22050)
@@ -74,6 +73,7 @@ jobs:
           print("silence.wav criado")
           PYEOF
           ls -lh icon48.png banner.png silence.wav || true
+          file banner.png || true
           smdhtool --create "Tomodachi Editor" "Tomodachi Life Save Editor for 3DS by Darkness Metal" "Darkness Metal" icon48.png TomodachiReal.smdh
           ls -lh TomodachiReal.smdh || true
           3dsxtool TomodachiReal.elf TomodachiReal.3dsx --smdh=TomodachiReal.smdh
@@ -228,4 +228,26 @@ jobs:
           RSFEOF
           echo "=== FASE 4: makerom ==="
           rm -f makerom.zip makerom
-          if ! curl -L --retry 3 -f -o makerom.zip https://github
+          if ! curl -L --retry 3 -f -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-v0.18.4-ubuntu_x86_64.zip; then
+            curl -L --retry 3 -f -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-ubuntu_x86_64
+          fi
+          if unzip -o makerom.zip; then echo "makerom zip ok"; else cp makerom.zip makerom; fi
+          MAKEROM_BIN=$(find . -name "makerom" -type f | head -1)
+          test -n "$MAKEROM_BIN"
+          chmod +x "$MAKEROM_BIN" || true
+          echo "=== FASE 5: CIA V2 ==="
+          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -elf TomodachiReal.elf -rsf TomodachiReal.rsf -target t -exefslogo -icon TomodachiReal.smdh -banner TomodachiReal.bnr
+          ls -lh *.3dsx *.cia *.smdh *.bnr || true
+          test -s TomodachiReal.cia
+          stat -c%s TomodachiReal.cia
+
+      - name: Salvar arquivos V2
+        uses: actions/upload-artifact@v4
+        with:
+          name: TomodachiReal-cia-V2
+          path: |
+            *.3dsx
+            *.cia
+            *.smdh
+            *.bnr
+            *.elf
