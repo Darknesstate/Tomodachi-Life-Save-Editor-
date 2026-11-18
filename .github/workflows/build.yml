@@ -37,7 +37,7 @@ jobs:
             ContentType             : Application
             Logo                    : Nintendo
           TitleInfo:
-            UniqueId                : 0x00000000
+            UniqueId                : 0x0004000000D00000
             Category                : Application
           Option:
             UseOnSD                 : true
@@ -153,7 +153,7 @@ jobs:
               - ssl:C
               - y2r:u
           SystemControlInfo:
-            SaveDataSize            : 0K
+            SaveDataSize            : 0
             RemasterVersion         : 0
             StackSize               : 0x40000
           RSFEOF
@@ -168,20 +168,21 @@ jobs:
           test -n "$MAKEROM_BIN"
           ls -lh "$MAKEROM_BIN" || true
           chmod +x "$MAKEROM_BIN" || true
-          dkp-pacman -Sy --noconfirm 3dstools || true
-          ls /opt/devkitpro/tools/bin/ | grep -i exheader || true
-          which elf2exheader || true
-          ls -lh /opt/devkitpro/tools/bin/elf2exheader || true
-          elf2exheader --help || true
-          arm-none-eabi-objdump -h TomodachiReal.elf || true
-          elf2exheader TomodachiReal.elf TomodachiReal.exheader || /opt/devkitpro/tools/bin/elf2exheader TomodachiReal.elf TomodachiReal.exheader || elf2exheader TomodachiReal.elf TomodachiReal.rsf TomodachiReal.exheader || elf2exheader -a TomodachiReal.rsf TomodachiReal.elf TomodachiReal.exheader || arm-none-eabi-objcopy -O binary --only-section=.exheader TomodachiReal.elf TomodachiReal.exheader
-          ls -lh TomodachiReal.exheader || true
-          test -s TomodachiReal.exheader
-          python3 -c "data=open('TomodachiReal.exheader','rb').read(); nz=sum(1 for b in data if b!=0); print('exheader size', len(data), 'bytes nao-zero', nz); import sys; sys.exit(0 if nz>100 else 1)"
-          rm -f TomodachiReal.cia
-          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0 || echo "Tentativa 1 com desc falhou, tentando sem desc"
+          ldd "$MAKEROM_BIN" || true
+          "$MAKEROM_BIN" --help || true
+          apt-get update || true
+          apt-get install -y libssl1.1 || true
+          ls /opt/devkitpro/tools/bin/ || true
+          rm -f TomodachiReal.cia TomodachiReal.exheader
+          "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh || echo "Tentativa 1 sem exheader sem desc falhou"
           test -s TomodachiReal.cia || rm -f TomodachiReal.cia
-          test -s TomodachiReal.cia || "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader
+          test -s TomodachiReal.cia || "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -desc app:0 || echo "Tentativa 2 com desc falhou, tentando construir elf2exheader"
+          test -s TomodachiReal.cia || rm -f TomodachiReal.cia
+          test -s TomodachiReal.cia || git clone --depth 1 https://github.com/devkitPro/3dstools.git /tmp/3dstools || true
+          test -s TomodachiReal.cia || gcc -o /tmp/elf2exheader /tmp/3dstools/src/elf2exheader.c || cc -o /tmp/elf2exheader /tmp/3dstools/src/elf2exheader.c || true
+          test -s TomodachiReal.cia || /tmp/elf2exheader TomodachiReal.elf TomodachiReal.exheader || true
+          ls -lh TomodachiReal.exheader || true
+          test -s TomodachiReal.cia || "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0 || echo "Tentativa 3 com exheader falhou"
           ls -lh *.3dsx *.cia *.smdh || true
           test -s TomodachiReal.cia
           stat -c%s TomodachiReal.cia
@@ -195,4 +196,3 @@ jobs:
             *.cia
             *.smdh
             *.elf
-            *.exheader
