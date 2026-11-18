@@ -100,3 +100,4 @@ int main(int argc, char* argv[]) {
         while (aptMainLoop()) { hidScanInput(); if (hidKeysDown() & KEY_START) break; gfxSwapBuffers(); gspWaitForVBlank(); }
         gfxExit(); return 0;
 }
+}
