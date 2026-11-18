@@ -154,10 +154,19 @@ jobs:
           RSFEOF
           elf2exheader TomodachiReal.elf TomodachiReal.exheader || arm-none-eabi-objcopy -O binary --only-section=.exheader TomodachiReal.elf TomodachiReal.exheader || python3 -c "open('TomodachiReal.exheader','wb').write(b'\x00'*0x1000)"
           python3 -c "d=open('TomodachiReal.exheader','rb').read(); open('TomodachiReal.exheader','wb').write(d.ljust(0x1000,b'\x00')[:0x1000])"
-          git clone --depth 1 https://github.com/3DSGuy/Project_CTR.git /tmp/ctr
-          cd /tmp/ctr/makerom && make -j4 || make
-          cd $GITHUB_WORKSPACE
-          /tmp/ctr/makerom/bin/makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0
+          curl -s https://api.github.com/repos/3DSGuy/Project_CTR/releases/tags/makerom-v0.18.4 > /tmp/rel.json
+          cat /tmp/rel.json | grep -i "makerom.*linux" || cat /tmp/rel.json | grep -i "browser_download_url"
+          MAKEROM_URL=$(grep -o '"browser_download_url": "[^"]*"' /tmp/rel.json | grep -i linux | grep -i makerom | head -1 | cut -d'"' -f4)
+          echo "Baixando $MAKEROM_URL"
+          curl -L -o makerom_pkg "$MAKEROM_URL"
+          ls -lh makerom_pkg
+          unzip -o makerom_pkg || tar -xzf makerom_pkg || true
+          find . -maxdepth 3 -name "*makerom*" -type f | head -20
+          chmod +x ./makerom* 2>/dev/null || true
+          chmod +x ./makerom-v*/bin/makerom 2>/dev/null || true
+          MAKEROM_BIN=$(find . -name "makerom" -type f | head -1)
+          echo "Usando $MAKEROM_BIN"
+          $MAKEROM_BIN -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh -exheader TomodachiReal.exheader -desc app:0
           ls -lh *.3dsx *.cia *.smdh || true
 
       - name: Salvar arquivos
