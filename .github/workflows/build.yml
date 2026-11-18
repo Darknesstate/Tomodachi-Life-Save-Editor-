@@ -27,7 +27,7 @@ jobs:
           git clone --depth 1 https://github.com/3DSGuy/Project_CTR.git /tmp/ctr
           cd /tmp/ctr/makerom && make -j4 || make
           cd $GITHUB_WORKSPACE
-          /tmp/ctr/makerom/makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh
+          /tmp/ctr/makerom/bin/makerom -f cia -o TomodachiReal.cia -rsf TomodachiReal.rsf -target t -exefslogo -code TomodachiReal.elf -icon TomodachiReal.smdh
           ls -lh *.3dsx *.cia *.smdh || true
 
       - name: Salvar arquivos
