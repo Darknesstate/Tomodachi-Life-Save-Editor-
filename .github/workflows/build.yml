@@ -167,27 +167,25 @@ jobs:
             RemasterVersion         : 0
             StackSize               : 0x40000
           RSFEOF
-          echo "=== FASE 4: makerom ==="
+          echo "=== FASE 4: makerom - sem comando file ==="
           rm -f makerom.zip makerom
           if ! curl -L --retry 3 -f -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-v0.18.4-ubuntu_x86_64.zip; then
             echo "primeiro link do makerom falhou, tentando segundo nome..."
             curl -L --retry 3 -f -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-ubuntu_x86_64
           fi
           ls -lh makerom.zip || true
-          file makerom.zip || true
-          if file makerom.zip | grep -q "Zip archive"; then
-            echo "makerom veio como zip, descompactando..."
-            unzip -l makerom.zip || true
-            unzip -o makerom.zip
+          echo "tentando descompactar makerom.zip..."
+          if unzip -o makerom.zip; then
+            echo "makerom descompactado de zip"
           else
-            echo "makerom veio como binario direto, usando como makerom..."
+            echo "makerom nao era zip, usando como binario direto"
             cp makerom.zip makerom
           fi
           MAKEROM_BIN=$(find . -name "makerom" -type f | head -1)
           echo "MAKEROM_BIN=$MAKEROM_BIN"
           test -n "$MAKEROM_BIN"
           chmod +x "$MAKEROM_BIN" || true
-          ldd "$MAKEROM_BIN" || true
+          ls -lh "$MAKEROM_BIN" || true
           echo "=== FASE 5: CIA direto do ELF, sem exheader ==="
           "$MAKEROM_BIN" -f cia -o TomodachiReal.cia -elf TomodachiReal.elf -rsf TomodachiReal.rsf -target t -exefslogo -icon TomodachiReal.smdh -desc app:0
           ls -lh *.3dsx *.cia *.smdh || true
