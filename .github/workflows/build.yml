@@ -133,7 +133,7 @@ jobs:
           export PATH="/tmp/tools:$PATH"
           if [ ! -x /tmp/tools/makerom ]; then echo "ERRO: sem makerom"; exit 1; fi
           if [ ! -f banner.bnr ]; then echo "ERRO: sem banner.bnr"; exit 1; fi
-          printf 'BasicInfo:\n  Title : "Tomodachi Life Save Editor"\n  CompanyCode : "00"\n  ProductCode : "CTR-P-TLSE"\n  ContentType : "Application"\nTitleInfo:\n  UniqueId : 0x01F001\n  Category : 0\nOption:\n  UseOnSD : true\n  EnableCrypt : false\n  EnableCompress : true\n' > game.rsf
+          printf 'BasicInfo:\n  Title : "Tomodachi Life Save Editor"\n  CompanyCode : "00"\n  ProductCode : "CTR-P-TLSE"\n  ContentType : "Application"\nTitleInfo:\n  UniqueId : 0x01F001\n  Category : "Application"\nOption:\n  UseOnSD : true\n  EnableCrypt : false\n  EnableCompress : true\n' > game.rsf
           cat game.rsf || true
           makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.smdh -banner banner.bnr
           ls -lh TomodachiLifeSaveEditor.cia
