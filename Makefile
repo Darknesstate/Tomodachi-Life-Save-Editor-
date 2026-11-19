@@ -1,81 +1,44 @@
 TARGET := TomodachiLifeSaveEditor
 BUILD := build
 SOURCES := source
-DATA := data
 INCLUDES := include
-
+DATA := data
 APP_TITLE := Tomodachi Life Save Editor
 APP_DESCRIPTION := Dinheiro Max no Tomodachi Life
 APP_AUTHOR := Darkness Metal
 APP_ICON := icon.png
-
-#[STRIPPED 81 bytes]
-.SUFFIXES:
-#[STRIPPED 81 bytes]
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
-
-TOPDIR ?= $(CURDIR)
-include $(DEVKITARM)/3ds_rules
-
-ARCH := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
-
-CFLAGS := -g -Wall -O2 -mword-relocations -ffunction-sections $(ARCH)
-CFLAGS += $(INCLUDE) -DARM11 -D_3DS
-CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
-ASFLAGS := -g $(ARCH)
-LDFLAGS = -specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+ARCH := arm-none-eabi
+PREFIX := $(DEVKITARM)/bin/$(ARCH)-
+CC := $(PREFIX)gcc
+CXX := $(PREFIX)g++
+LD := $(PREFIX)gcc
+OBJCOPY := $(PREFIX)objcopy
+CFLAGS := -g -O2 -w -mword-relocations -ffunction-sections -fdata-sections
+CFLAGS += -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
+CFLAGS += -Wno-error -Wno-format -Wno-int-conversion -Wno-misleading-indentation -Wno-unused-parameter -Wno-unused-variable
+CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
+ASFLAGS := -g $(ARCHFLAGS)
+LDFLAGS := -specs=3dsx.specs -g -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -Wl,-Map,$(notdir $*.map)
 LIBS := -lctru -lm
-LIBDIRS := $(CTRULIB)
-
-ifneq ($(BUILD),$(notdir $(CURDIR)))
-
-export OUTPUT := $(CURDIR)/$(TARGET)
-export TOPDIR := $(CURDIR)
-export VPATH := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) $(foreach dir,$(DATA),$(CURDIR)/$(dir))
-export DEPSDIR := $(CURDIR)/$(BUILD)
-
 CFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-BINFILES := $(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
-
-ifeq ($(strip $(CPPFILES)),)
-	export LD := $(CC)
-else
-	export LD := $(CXX)
-endif
-
-export OFILES_BIN := $(addsuffix .o,$(BINFILES))
-export OFILES_SRC := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
-export OFILES := $(OFILES_BIN) $(OFILES_SRC)
-export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES)))
-export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) $(foreach dir,$(LIBDIRS),-I$(dir)/include) -I$(CURDIR)/$(BUILD)
-export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
-
-.PHONY: $(BUILD) clean all
-all: $(BUILD)
-
+OFILES := $(CFILES:.c=.o) $(CPPFILES:.cpp=.o) $(SFILES:.s=.o)
+OFILES := $(addprefix $(BUILD)/,$(OFILES))
+all: $(TARGET).smdh $(TARGET).3dsx
 $(BUILD):
-	@[ -d $@ ] || mkdir -p $@
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
-
+	@mkdir -p $@
+$(BUILD)/%.o: $(SOURCES)/%.c | $(BUILD)
+	$(CC) -MMD -MP -MF $(@:.o=.d) $(CFLAGS) -I$(INCLUDES) -c $< -o $@
+$(BUILD)/%.o: $(SOURCES)/%.cpp | $(BUILD)
+	$(CXX) -MMD -MP -MF $(@:.o=.d) $(CXXFLAGS) -I$(INCLUDES) -c $< -o $@
+$(BUILD)/%.o: $(SOURCES)/%.s | $(BUILD)
+	$(CC) -MMD -MP -MF $(@:.o=.d) $(ASFLAGS) -c $< -o $@
+$(TARGET).elf: $(OFILES)
+	$(LD) $(LDFLAGS) $(OFILES) $(LIBS) -o $@
+$(TARGET).smdh: $(APP_ICON)
+	@smdhtool --create "$(APP_TITLE)" "$(APP_DESCRIPTION)" "$(APP_AUTHOR)" $(APP_ICON) $(TARGET).smdh || smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max" "Darkness Metal" icon.png $(TARGET).smdh
+$(TARGET).3dsx: $(TARGET).elf $(TARGET).smdh
+	3dsxtool --smdh=$(TARGET).smdh --romfs=$(DATA) $< $@
 clean:
-	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).3dsx $(TARGET).smdh $(TARGET).cia $(TARGET).elf
-
-else
-
-DEPENDS := $(OFILES:.o=.d)
-$(OUTPUT).3dsx : $(OUTPUT).elf
-$(OUTPUT).elf : $(OFILES)
-$(OFILES_SRC) : $(HFILES)
-
-$(OUTPUT).smdh : $(OUTPUT).elf
-	@echo "Building SMDH..."
-	@smdh -f "$(APP_TITLE)" -d "$(APP_DESCRIPTION)" -a "$(APP_AUTHOR)" -i "$(TOPDIR)/$(APP_ICON)" -o $@
-
--include $(DEPENDS)
-
-endif
+	@rm -rf $(BUILD) $(TARGET).elf $(TARGET).3dsx $(TARGET).smdh
