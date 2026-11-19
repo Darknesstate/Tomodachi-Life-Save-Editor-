@@ -1,4 +1,4 @@
-name: Build 3DSX + CIA - V4.6 Auto-Cura
+name: Build 3DS
 
 on:
   push:
@@ -7,345 +7,36 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: devkitpro/devkitarm:latest
+    container: devkitpro/devkitarm:latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Diagnostico + Auto-Cura - nunca trava o build
-        continue-on-error: true
+      - name: Build V4
+        run: make
+
+      - name: Baixar ferramentas
         run: |
-          set +e
-          export PATH="/opt/devkitpro/tools/bin:/opt/devkitpro/devkitARM/bin:$PATH"
-          echo "=== DIAGNOSTICO ==="
-          pwd
-          ls -R | head -n 200
-          mkdir -p source build
-          # --- Acha arquivos mesmo com nome maiusculo ou pasta errada ---
-          ICON_SRC=$(find . -maxdepth 3 -iname "icon.png" | grep -v "/build/" | head -n1)
-          BANNER_SRC=$(find . -maxdepth 3 -iname "banner.png" | grep -v "/build/" | head -n1)
-          AUDIO_SRC=$(find . -maxdepth 3 -iname "*umbreon*.wav" | head -n1)
-          if [ -z "$AUDIO_SRC" ]; then AUDIO_SRC=$(find . -maxdepth 3 -iname "*.wav" | head -n1); fi
-          MAIN_SRC=$(find . -maxdepth 3 -iname "main.c" | head -n1)
-          echo "Icon achado: $ICON_SRC"
-          echo "Banner achado: $BANNER_SRC"
-          echo "Audio achado: $AUDIO_SRC"
-          echo "Main achado: $MAIN_SRC"
-          # --- Copia pro lugar certo SEM apagar original ---
-          if [ -n "$ICON_SRC" ] && [ "$ICON_SRC" != "./icon.png" ]; then cp -v "$ICON_SRC" ./icon.png || true; fi
-          if [ -n "$BANNER_SRC" ] && [ "$BANNER_SRC" != "./banner.png" ]; then cp -v "$BANNER_SRC" ./banner.png || true; fi
-          if [ -n "$AUDIO_SRC" ] && [ "$AUDIO_SRC" != "./umbreon_cry.wav" ]; then cp -v "$AUDIO_SRC" ./umbreon_cry.wav || true; fi
-          if [ -n "$MAIN_SRC" ] && [ "$MAIN_SRC" != "./source/main.c" ]; then cp -v "$MAIN_SRC" ./source/main.c || true; fi
-          ls -lh icon.png banner.png umbreon_cry.wav source/main.c Makefile 2>&1 || true
-          # --- Cria copias corrigidas em build/ - original intacto ---
-          python3 -c "
-          import sys
-          try:
-            from PIL import Image
-            has_pil=True
-          except:
-            has_pil=False
-            print('Sem PIL, usa copia simples')
-          import shutil, os
-          os.makedirs('build', exist_ok=True)
-          if os.path.exists('icon.png'):
-            try:
-              if has_pil:
-                im=Image.open('icon.png').convert('RGBA').resize((48,48))
-                im.save('build/icon_fixed.png')
-                print('icon_fixed 48x48 OK')
-              else:
-                shutil.copy('icon.png','build/icon_fixed.png')
-            except Exception as e:
-              print('icon fallback:', e)
-              shutil.copy('icon.png','build/icon_fixed.png')
-          if os.path.exists('banner.png'):
-            try:
-              if has_pil:
-                im=Image.open('banner.png').convert('RGB').resize((256,128))
-                im.save('build/banner_fixed.png')
-                print('banner_fixed 256x128 OK')
-              else:
-                shutil.copy('banner.png','build/banner_fixed.png')
-            except Exception as e:
-              print('banner fallback:', e)
-              shutil.copy('banner.png','build/banner_fixed.png')
-          else:
-            print('banner.png faltando, criando 256x128 solido')
-            import zlib, struct
-            def chunk(t,d):
-              c=struct.pack('>I', len(d))+t+d
-              c+=struct.pack('>I', zlib.crc32(t+d) & 0xffffffff)
-              return c
-            w,h=256,128
-            raw=b''.join(b'\x00'+bytes([20,20,40])*w for _ in range(h))
-            png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR', struct.pack('>IIBBBBB', w,h,8,2,0,0,0))+chunk(b'IDAT', zlib.compress(raw))+chunk(b'IEND', b'')
-            open('build/banner_fixed.png','wb').write(png)
-          " || echo "Python de correcao falhou, segue com copias simples"
-          cp -v icon.png build/icon_fixed.png 2>/dev/null || true
-          cp -v banner.png build/banner_fixed.png 2>/dev/null || true
-          ls -lh build/icon_fixed.png build/banner_fixed.png || true
-          # --- Audio: copia + silencio de emergencia ---
-          python3 -c "import wave; w=wave.open('build/silencio.wav','wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050); w.writeframes(b'\x00\x00'*22050); w.close(); print('silencio.wav OK')" || true
-          if [ -f umbreon_cry.wav ]; then cp -v umbreon_cry.wav build/audio_original.wav || true; fi
-          echo "=== AUTO-CURA CONCLUIDA - NUNCA DA EXIT 1 ==="
-          exit 0
+          mkdir -p tools
+          wget -O tools/bannertool.tar.gz https://github.com/Steveice10/bannertool/releases/download/1.2.0/bannertool-1.2.0-linux.tar.gz || true
+          tar -xzf tools/bannertool.tar.gz -C tools || true
+          chmod +x tools/bannertool || true
+          wget -O tools/makerom https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-v0.18.4-ubuntu_x86_64 || true
+          chmod +x tools/makerom || true
 
-      - name: Build 3DSX - tenta 3 vezes
-        if: always()
-        continue-on-error: true
+      - name: Fazer CIA
         run: |
-          set +e
-          export PATH="/opt/devkitpro/tools/bin:/opt/devkitpro/devkitARM/bin:$PATH"
-          make clean || true
-          echo "Tentativa 1..."
-          make || echo "Tentativa 1 falhou, limpando e tentando de novo"
-          if [ ! -f TomodachiLifeSaveEditor.3dsx ] && [ ! -f build/TomodachiLifeSaveEditor.3dsx ]; then
-            echo "Tentativa 2 - clean + make..."
-            make clean || true
-            make || true
-          fi
-          if [ ! -f TomodachiLifeSaveEditor.3dsx ] && [ ! -f build/TomodachiLifeSaveEditor.3dsx ]; then
-            echo "Tentativa 3 - verbose..."
-            make clean || true
-            make V=1 || true
-          fi
-          echo "=== Resultado ==="
-          ls -lh *.3dsx *.smdh *.elf build/*.elf 2>&1 || true
-          find . -maxdepth 2 -name "*.3dsx" -o -name "*.smdh" | head -n 20
-          exit 0
+          set -e
+          ELF_FILE=$(ls *.elf | head -n 1)
+          if [ ! -f sound.wav ]; then python3 -c "import wave; w=wave.open('sound.wav','wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050); w.writeframes(b'\x00\x00'*22050); w.close()"; fi
+          ./tools/bannertool makebanner -i banner.png -a sound.wav -o banner.bnr
+          ./tools/bannertool makeicon -i icon.png -o icon.icn
+          ./tools/makerom -f cia -o "Tomodachi Life Save Editor.cia" -elf "$ELF_FILE" -rsf TomodachiReal.rsf -icon icon.icn -banner banner.bnr -exefslogo -target t
 
-      - name: Banner + Icon + CIA - Auto-Cura com 4 fallbacks
-        if: always()
-        continue-on-error: true
-        run: |
-          set +e
-          export PATH="/opt/devkitpro/tools/bin:/opt/devkitpro/devkitARM/bin:$PATH"
-          mkdir -p build
-          # --- ELF ---
-          ELF_FILE=$(find . -maxdepth 2 -name "TomodachiLifeSaveEditor.elf" | head -n1)
-          echo "ELF: $ELF_FILE"
-          if [ -n "$ELF_FILE" ]; then
-            cp -v "$ELF_FILE" build/strip-input.elf || true
-            arm-none-eabi-strip -o build/TomodachiLifeSaveEditor-strip.elf build/strip-input.elf || cp -v build/strip-input.elf build/TomodachiLifeSaveEditor-strip.elf || true
-          fi
-          ls -lh build/*strip*.elf || echo "SEM ELF - CIA nao vai gerar, mas 3DSX ainda sobe"
-          # --- ICON: tenta makesmdh, se falhar usa .smdh do make ---
-          bannertool makesmdh -s "Tomodachi Life Save Editor" -l "Dinheiro Max no Tomodachi Life" -p "Darkness Metal" -i build/icon_fixed.png -o build/icon.icn || bannertool makesmdh -s "Tomodachi Life Save Editor" -l "Dinheiro Max no Tomodachi Life" -p "Darkness Metal" -i icon.png -o build/icon.icn || echo "makesmdh falhou"
-          if [ ! -f build/icon.icn ]; then
-            SMDH=$(find . -maxdepth 2 -name "*.smdh" | head -n1)
-            if [ -n "$SMDH" ]; then cp -v "$SMDH" build/icon.icn; echo "Usando smdh do make como icon: $SMDH"; fi
-          fi
-          ls -lh build/icon.icn || true
-          # --- AUDIO: converte SO a copia ---
-          cp -v build/audio_original.wav /tmp/umbreon_for_banner.wav 2>/dev/null || cp -v umbreon_cry.wav /tmp/umbreon_for_banner.wav 2>/dev/null || cp -v build/silencio.wav /tmp/umbreon_for_banner.wav || true
-          if command -v ffmpeg >/dev/null 2>&1; then
-            ffmpeg -y -i /tmp/umbreon_for_banner.wav -ar 22050 -ac 1 -acodec pcm_s16le /tmp/umbreon_banner_final.wav || cp /tmp/umbreon_for_banner.wav /tmp/umbreon_banner_final.wav || cp build/silencio.wav /tmp/umbreon_banner_final.wav || true
-          else
-            cp /tmp/umbreon_for_banner.wav /tmp/umbreon_banner_final.wav || cp build/silencio.wav /tmp/umbreon_banner_final.wav || true
-          fi
-          # --- BANNER: 4 tentativas ---
-          echo "Banner tentativa 1: banner_fixed + som convertido"
-          bannertool makebanner -i build/banner_fixed.png -a /tmp/umbreon_banner_final.wav -o build/banner.bnr || echo "T1 falhou"
-          if [ ! -f build/banner.bnr ]; then echo "Banner tentativa 2: banner_fixed + som original"; bannertool makebanner -i build/banner_fixed.png -a umbreon_cry.wav -o build/banner.bnr || echo "T2 falhou"; fi
-          if [ ! -f build/banner.bnr ]; then echo "Banner tentativa 3: banner_fixed sem som"; bannertool makebanner -i build/banner_fixed.png -o build/banner.bnr || echo "T3 falhou"; fi
-          if [ ! -f build/banner.bnr ]; then echo "Banner tentativa 4: banner.png original sem som"; bannertool makebanner -i banner.png -o build/banner.bnr || echo "T4 falhou"; fi
-          ls -lh build/banner.bnr || echo "SEM BANNER - tenta CIA sem banner"
-          # --- RSF: UniqueId diferente do jogo 0x008C3 ---
-          cat > build/app.rsf << 'RSFEOF'
-          BasicInfo:
-            Title                   : "Tomodachi Life Save Editor"
-            ProductCode             : "CTR-P-TLSE"
-            Logo                    : Nintendo
-          TitleInfo:
-            Category                : Application
-            UniqueId                : 0x0A5E1
-          Option:
-            UseOnSD                 : true
-            FreeProductCode         : true
-            MediaFootPadding        : false
-            EnableCrypt             : false
-            EnableCompress          : true
-          AccessControlInfo:
-            CoreVersion                   : 2
-            DescVersion                   : 2
-            ReleaseKernelMajor            : "02"
-            ReleaseKernelMinor            : "33"
-            UseExtSaveData                : false
-            FileSystemAccess:
-              - CategoryFileSystemTool
-              - DirectSdmc
-            MemoryType                    : Application
-            SystemMode                    : 64MB
-            IdealProcessor                : 0
-            AffinityMask                  : 1
-            Priority                      : 16
-            MaxCpu                        : 0x9E
-            HandleTableSize               : 0x200
-            DisableDebug                  : false
-            EnableForceDebug              : false
-            CanWriteSharedPage            : true
-            CanUsePrivilegedPriority      : false
-            CanUseNonAlphabetAndNumber    : true
-            PermitMainFunctionArgument    : true
-            CanShareDeviceMemory          : true
-            RunnableOnSleep               : false
-            SpecialMemoryArrange          : true
-            SystemModeExt                 : Legacy
-            CpuSpeed                      : 256MHz
-            EnableL2Cache                 : true
-            CanAccessCore2                : true
-            IORegisterMapping:
-              - 1ff00000-1ff7ffff
-            MemoryMapping:
-              - 1f000000-1f5fffff:r
-            SystemCallAccess:
-              ArbitrateAddress: 34
-              Backdoor: 123
-              Break: 60
-              CancelTimer: 28
-              ClearEvent: 25
-              ClearTimer: 29
-              CloseHandle: 35
-              ConnectToPort: 45
-              ControlMemory: 1
-              ControlProcessMemory: 112
-              CreateAddressArbiter: 33
-              CreateEvent: 23
-              CreateMemoryBlock: 30
-              CreateMutex: 19
-              CreateSemaphore: 21
-              CreateThread: 8
-              CreateTimer: 26
-              DuplicateHandle: 39
-              ExitProcess: 3
-              ExitThread: 9
-              GetCurrentProcessorNumber: 17
-              GetHandleInfo: 41
-              GetProcessId: 53
-              GetProcessIdOfThread: 54
-              GetProcessIdealProcessor: 6
-              GetProcessInfo: 43
-              GetResourceLimit: 56
-              GetResourceLimitCurrentValues: 58
-              GetResourceLimitLimitValues: 57
-              GetSystemInfo: 42
-              GetSystemTick: 40
-              GetThreadContext: 59
-              GetThreadId: 55
-              GetThreadIdealProcessor: 15
-              GetThreadInfo: 44
-              GetThreadPriority: 11
-              MapMemoryBlock: 31
-              OutputDebugString: 61
-              QueryMemory: 2
-              ReleaseMutex: 20
-              ReleaseSemaphore: 22
-              SendSyncRequest1: 46
-              SendSyncRequest2: 47
-              SendSyncRequest3: 48
-              SendSyncRequest4: 49
-              SendSyncRequest: 50
-              SetThreadPriority: 12
-              SetTimer: 27
-              SignalEvent: 24
-              SleepThread: 10
-              UnmapMemoryBlock: 32
-              WaitSynchronization1: 36
-              WaitSynchronizationN: 37
-            ServiceAccessControl:
-              - APT:U
-              - ac:u
-              - am:net
-              - boss:U
-              - cam:u
-              - cecd:u
-              - cfg:nor
-              - cfg:u
-              - csnd:SND
-              - dsp::DSP
-              - frd:u
-              - fs:USER
-              - gsp::Gpu
-              - hid:USER
-              - http:C
-              - ir:rst
-              - ir:u
-              - ir:USER
-              - mic:u
-              - ndm:u
-              - news:u
-              - nwm::UDS
-              - ptm:u
-              - pxi:dev
-              - soc:U
-              - ssl:C
-              - y2r:u
-          SystemControlInfo:
-            SaveDataSize: 0KB
-            RemasterVersion: 2
-            StackSize: 0x40000
-          Dependency:
-            ac: 0x0004013000002402
-            am: 0x0004013000001502
-            boss: 0x0004013000003402
-            camera: 0x0004013000001602
-            cecd: 0x0004013000002602
-            cfg: 0x0004013000001702
-            codec: 0x0004013000001802
-            csnd: 0x0004013000002702
-            dlp: 0x0004013000002802
-            dsp: 0x0004013000001a02
-            friends: 0x0004013000003202
-            gpio: 0x0004013000001b02
-            gsp: 0x0004013000001c02
-            hid: 0x0004013000001d02
-            http: 0x0004013000002902
-            i2c: 0x0004013000001e02
-            ir: 0x0004013000003302
-            mcu: 0x0004013000001f02
-            mic: 0x0004013000002002
-            ndm: 0x0004013000002b02
-            news: 0x0004013000003502
-            nim: 0x0004013000002c02
-            nwm: 0x0004013000002d02
-            pdn: 0x0004013000002102
-            ps: 0x0004013000003102
-            ptm: 0x0004013000002202
-            ro: 0x0004013000003702
-            socket: 0x0004013000002e02
-            spi: 0x0004013000002302
-            ssl: 0x0004013000002f02
-          RSFEOF
-          # --- CIA: 3 tentativas ---
-          echo "CIA tentativa 1: com banner + icon"
-          makerom -f cia -o build/TomodachiLifeSaveEditor.cia -DAPP_ENCRYPTED=false -rsf build/app.rsf -target t -exefslogo -elf build/TomodachiLifeSaveEditor-strip.elf -icon build/icon.icn -banner build/banner.bnr -major 1 -minor 0 -micro 0 || echo "CIA T1 falhou"
-          if [ ! -f build/TomodachiLifeSaveEditor.cia ]; then echo "CIA tentativa 2: sem banner"; makerom -f cia -o build/TomodachiLifeSaveEditor.cia -DAPP_ENCRYPTED=false -rsf build/app.rsf -target t -exefslogo -elf build/TomodachiLifeSaveEditor-strip.elf -icon build/icon.icn -major 1 -minor 0 -micro 0 || echo "CIA T2 falhou"; fi
-          if [ ! -f build/TomodachiLifeSaveEditor.cia ]; then echo "CIA tentativa 3: sem banner sem icon"; makerom -f cia -o build/TomodachiLifeSaveEditor.cia -DAPP_ENCRYPTED=false -rsf build/app.rsf -target t -exefslogo -elf build/TomodachiLifeSaveEditor-strip.elf -major 1 -minor 0 -micro 0 || echo "CIA T3 falhou"; fi
-          ls -lh build/TomodachiLifeSaveEditor.cia || echo "CIA nao gerou, mas 3DSX ainda vale"
-          echo "=== FIM - original intacto ==="
-          ls -lh icon.png banner.png umbreon_cry.wav || true
-          exit 0
-
-      - name: Upload tudo - CIA incluso
+      - name: Subir ZIP
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: TomodachiLifeSaveEditor-V4
+          name: Tomodachi-V4-CIA
           path: |
-            TomodachiLifeSaveEditor.3dsx
-            TomodachiLifeSaveEditor.smdh
-            build/TomodachiLifeSaveEditor.cia
-            build/TomodachiLifeSaveEditor.3dsx
-            build/TomodachiLifeSaveEditor.smdh
-          if-no-files-found: warn
-
-      - name: Upload 3DSX mesmo se CIA falhar
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: TomodachiLifeSaveEditor-3DSX-only
-          path: |
-            TomodachiLifeSaveEditor.3dsx
-            TomodachiLifeSaveEditor.smdh
-          if-no-files-found: warn
+            *.3dsx
+            *.cia
