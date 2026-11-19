@@ -15,20 +15,25 @@ jobs:
       - name: Build V4
         run: make
 
-      - name: Fazer CIA com Auto-Cura
+      - name: Baixar bannertool e makerom
         run: |
           set -e
-          export PATH="/opt/devkitpro/tools/bin:$PATH"
-          echo "=== Arquivos ==="
-          ls -l
+          mkdir -p tools
+          echo "Baixando bannertool..."
+          wget -O tools/bannertool https://raw.githubusercontent.[STRIPPED 89 bytes] || wget -O tools/bannertool https://raw.githubusercontent.com/libretro/RetroArch/master/ctr/tools/bannertool-linux || true
+          echo "Baixando makerom..."
+          wget -O tools/makerom https://raw.githubusercontent.[STRIPPED 86 bytes] || wget -O tools/makerom https://raw.githubusercontent.com/libretro/RetroArch/master/ctr/tools/makerom-linux || true
+          chmod +x tools/bannertool tools/makerom || true
+          ls -lh tools/
+          if [ ! -s tools/bannertool ]; then echo "ERRO bannertool vazio"; exit 1; fi
+          if [ ! -s tools/makerom ]; then echo "ERRO makerom vazio"; exit 1; fi
+          echo "Ferramentas OK"
+
+      - name: Fazer CIA
+        run: |
+          set -e
           ELF_FILE=$(ls *.elf | head -n 1)
           echo "ELF: $ELF_FILE"
-          if [ -z "$ELF_FILE" ]; then echo "ERRO: nenhum .elf achado"; exit 1; fi
-          if command -v bannertool >/dev/null 2>&1; then BT="bannertool"; elif [ -x "/opt/devkitpro/tools/bin/bannertool" ]; then BT="/opt/devkitpro/tools/bin/bannertool"; else BT="bannertool"; fi
-          if command -v makerom >/dev/null 2>&1; then MR="makerom"; elif [ -x "/opt/devkitpro/tools/bin/makerom" ]; then MR="/opt/devkitpro/tools/bin/makerom"; else MR="makerom"; fi
-          echo "bannertool: $BT"
-          echo "makerom: $MR"
-          pip install Pillow -q || pip3 install Pillow -q || true
           python3 << 'PY'
           import struct, zlib
           def read_size(p):
@@ -56,47 +61,21 @@ jobs:
             if s[0]==want_w and s[1]==want_h:
               print("tamanho OK", p)
               return
-            print("tamanho errado, tentando redimensionar", p)
-            try:
-              from PIL import Image
-              im=Image.open(p).convert('RGB').resize((want_w, want_h))
-              im.save(p)
-              print("redimensionado com Pillow")
-            except Exception as e:
-              print("Pillow falhou, criando novo", e)
-              make_png(want_w, want_h, 30,0,60, p)
+            print("tamanho errado, criando novo", p)
+            make_png(want_w, want_h, 30,0,60, p)
           fix('banner.png',256,128)
           fix('icon.png',48,48)
           PY
           if [ ! -f sound.wav ]; then python3 -c "import wave; w=wave.open('sound.wav','wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050); w.writeframes(b'\x00\x00'*22050); w.close()"; fi
-          if [ ! -f TomodachiReal.rsf ]; then cat > TomodachiReal.rsf << 'EOF'
-          BasicInfo:
-            Title: "Tomodachi Life Save Editor"
-            CompanyCode: "00"
-            ProductCode: "CTR-P-TLSE"
-            ContentType: Application
-            Logo: Nintendo
-          TitleInfo:
-            UniqueId: 0xFF3D5
-            Category: Application
-          AccessControlInfo:
-            UseExtSaveData: true
-            ExtSaveDataId: 0xFF3D5
-          SystemControlInfo:
-            SaveDataSize: 1M
-            RemasterVersion: 0
-            StackSize: 0x00040000
-          EOF
-          fi
-          $BT makebanner -i banner.png -a sound.wav -o banner.bnr
-          $BT makeicon -i icon.png -o icon.icn
-          $MR -f cia -o "Tomodachi Life Save Editor.cia" -elf "$ELF_FILE" -rsf TomodachiReal.rsf -icon icon.icn -banner banner.bnr -exefslogo -target t
+          ./tools/bannertool makebanner -i banner.png -a sound.wav -o banner.bnr
+          ./tools/bannertool makeicon -i icon.png -o icon.icn
+          ./tools/makerom -f cia -o "Tomodachi Life Save Editor.cia" -elf "$ELF_FILE" -rsf TomodachiReal.rsf -icon icon.icn -banner banner.bnr -exefslogo -target t
           ls -lh *.cia *.3dsx
 
       - name: Subir ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: Tomodachi-V4-【entity-CIA¦canonical_name=CIA】
+          name: Tomodachi-V4-CIA
           path: |
             *.3dsx
-            *.【entity-cia¦canonical_name=CIA】
+            *.cia
