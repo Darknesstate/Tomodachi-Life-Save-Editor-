@@ -14,25 +14,11 @@ jobs:
 
       - name: Install 3DS tools
         run: |
-          mkdir -p /tmp/tools
           echo "/opt/devkitpro/tools/bin" >> $GITHUB_PATH
-          echo "/tmp/tools" >> $GITHUB_PATH
-          export PATH="/opt/devkitpro/tools/bin:/tmp/tools:$PATH"
-          if [ ! -f /opt/devkitpro/tools/bin/bannertool ]; then
-            echo "Baixando bannertool do GitHub..."
-            curl -L -o /tmp/bannertool.zip https://github.com/Steveice10/bannertool/releases/download/1.2.0/bannertool.zip
-            unzip -o /tmp/bannertool.zip -d /tmp/tools
-            find /tmp/tools -name "bannertool*" -type f -exec chmod +x {} \;
-            cp /tmp/tools/Linux/bannertool /tmp/tools/bannertool 2>/dev/null || cp $(find /tmp/tools -name bannertool -type f | head -n1) /tmp/tools/bannertool
-          fi
-          if [ ! -f /opt/devkitpro/tools/bin/makerom ]; then
-            echo "Baixando makerom do GitHub..."
-            curl -L -o /tmp/makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18/makerom-v0.18-linux_x86_64.zip
-            unzip -o /tmp/makerom.zip -d /tmp/tools
-            find /tmp/tools -name "makerom*" -type f -exec chmod +x {} \;
-            cp $(find /tmp/tools -name makerom -type f | head -n1) /tmp/tools/makerom
-          fi
-          ls -lh /tmp/tools/bannertool /tmp/tools/makerom || ls -R /tmp/tools
+          export PATH="/opt/devkitpro/tools/bin:$PATH"
+          ls /opt/devkitpro/tools/bin/
+          which bannertool
+          which makerom
 
       - name: Build 3DSX
         run: |
@@ -41,7 +27,7 @@ jobs:
 
       - name: Make banner
         run: |
-          export PATH="/opt/devkitpro/tools/bin:/tmp/tools:$PATH"
+          export PATH="/opt/devkitpro/tools/bin:$PATH"
           ls -lh banner.png icon.png
           python3 -c "import wave; w=wave.open('silent.wav','wb'); w.setnchannels(2); w.setsampwidth(2); w.setframerate(44100); w.writeframes(b'\x00\x00\x00\x00'*44100); w.close()"
           bannertool makebanner -i banner.png -a silent.wav -o banner.bnr
@@ -49,7 +35,7 @@ jobs:
 
       - name: Make CIA
         run: |
-          export PATH="/opt/devkitpro/tools/bin:/tmp/tools:$PATH"
+          export PATH="/opt/devkitpro/tools/bin:$PATH"
           cat > game.rsf <<'EOF'
           BasicInfo:
             Title : "Tomodachi Life Save Editor"
