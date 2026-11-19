@@ -1,75 +1,77 @@
-name: Build 3DS
-
-on: [push]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    container:
-      image: devkitpro/devkitarm:latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build 3DSX e SMDH
-        run: make
-
-      - name: Instalar bannertool e makerom
-        run: |
-          echo "=== bannertool ==="
-          curl -fL https://github.com/Epicpkmn11/bannertool/releases/download/v1.2.2/bannertool.zip -o /tmp/bannertool.zip
-          python3 -m zipfile -e /tmp/bannertool.zip /tmp/bannertool
-          cp /tmp/bannertool/linux-x86_64/bannertool /usr/local/bin/bannertool
-          chmod +x /usr/local/bin/bannertool
-          ls -l /usr/local/bin/bannertool
-          echo "=== makerom - clonar com submodulos ==="
-          rm -rf /tmp/Project_CTR
-          git clone --recursive https://github.com/3DSGuy/Project_CTR.git /tmp/Project_CTR
-          echo "=== makerom - compilar ==="
-          set +e
-          make -C /tmp/Project_CTR/makerom deps -j2
-          make -C /tmp/Project_CTR/makerom program -j2
-          set -e
-          if [ ! -f /tmp/Project_CTR/makerom/bin/makerom ]; then
-            echo "Compilar falhou, baixando makerom pronto"
-            curl -fL https://raw.githubusercontent.com/libretro/RetroArch/master/ctr/tools/makerom-linux -o /usr/local/bin/makerom
-            chmod +x /usr/local/bin/makerom
-          else
-            cp /tmp/Project_CTR/makerom/bin/makerom /usr/local/bin/makerom
-            chmod +x /usr/local/bin/makerom
-          fi
-          ls -l /usr/local/bin/makerom
-          makerom --help || makerom -h || true
-
-      - name: Build CIA
-        run: |
-          echo "=== Arquivos ==="
-          ls -l
-          ls -l assets/ || ls -l ./
-          ls -l TomodachiReal.rsf
-          if [ -f assets/banner.png ]; then BANNER=assets/banner.png; elif [ -f banner.png ]; then BANNER=banner.png; else echo "banner.png nao achado"; exit 1; fi
-          if [ -f assets/icon.png ]; then ICON=assets/icon.png; elif [ -f icon.png ]; then ICON=icon.png; else echo "icon.png nao achado"; exit 1; fi
-          echo "BANNER=$BANNER ICON=$ICON"
-          mkdir -p build
-          echo "=== WAV silencioso para banner ==="
-          python3 -c "import wave,struct; w=wave.open('build/silent.wav','wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050); w.writeframes(struct.pack('<h',0)*22050); w.close()"
-          echo "=== Banner e icone ==="
-          bannertool makebanner -i "$BANNER" -a build/silent.wav -o build/banner.bnr
-          bannertool makesmdh -s "Tomodachi Life Save Editor" -l "Tomodachi Life Save Editor" -p "Darkness Metal" -i "$ICON" -o build/icon.icn
-          ls -l build/banner.bnr build/icon.icn
-          echo "=== Achar ELF ==="
-          ELF=$(find . -maxdepth 3 -name "*.elf" | head -n 1)
-          echo "ELF=$ELF"
-          ls -l "$ELF"
-          echo "=== Makerom CIA ==="
-          makerom -f cia -o TomodachiLifeSaveEditor.cia -DAPP_ENCRYPTED=false -rsf TomodachiReal.rsf -target t -exefslogo -elf "$ELF" -icon build/icon.icn -banner build/banner.bnr -major 1 -minor 0 -micro 0
-          ls -lh *.cia *.3dsx *.smdh
-
-      - name: Upload artefato
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: TomodachiLifeSaveEditor
-          path: |
-            *.3dsx
-            *.smdh
-            *.cia
+BasicInfo:
+  Title: "Tomodachi Life Save Editor"
+  ProductCode: "CTR-P-TLSE"
+  Logo: Nintendo
+TitleInfo:
+  Category: Application
+  UniqueId: 0xFF3FF
+Option:
+  UseOnSD: true
+  FreeProductCode: true
+  EnableCrypt: false
+  EnableCompress: true
+AccessControlInfo:
+  CoreVersion: 2
+  DescVersion: 2
+  ReleaseKernelMajor: "02"
+  ReleaseKernelMinor: "33"
+  FileSystemAccess:
+    - DirectSdmc
+  MemoryType: Application
+  SystemMode: 64MB
+  IdealProcessor: 0
+  AffinityMask: 1
+  Priority: 16
+  HandleTableSize: 0x200
+  DisableDebug: false
+  PermitMainFunctionArgument: true
+  MemoryMapping:
+    - 1f000000-1f5fffff:r
+  SystemCallAccess:
+    ArbitrateAddress: 34
+    Break: 60
+    CancelTimer: 28
+    ClearEvent: 25
+    CloseHandle: 35
+    ConnectToPort: 45
+    ControlMemory: 1
+    CreateEvent: 23
+    CreateMemoryBlock: 30
+    CreateMutex: 19
+    CreateSemaphore: 21
+    CreateThread: 8
+    CreateTimer: 26
+    DuplicateHandle: 39
+    ExitProcess: 3
+    ExitThread: 9
+    GetProcessIdealProcessor: 6
+    GetSystemInfo: 42
+    GetThreadPriority: 11
+    MapMemoryBlock: 31
+    OutputDebugString: 61
+    QueryMemory: 2
+    ReleaseMutex: 20
+    ReleaseSemaphore: 22
+    SendSyncRequest: 50
+    SetThreadPriority: 12
+    SetTimer: 27
+    SignalEvent: 24
+    SleepThread: 10
+    UnmapMemoryBlock: 32
+    WaitSynchronizationN: 37
+  ServiceAccessControl:
+    - apt:U
+    - cfg:u
+    - fs:USER
+    - gsp::Gpu
+    - hid:USER
+    - ldr:ro
+  SystemControlInfo:
+    SaveDataSize: 0K
+    StackSize: 0x40000
+  Dependency:
+    am: 0x0004013000001502
+    cfg: 0x0004013000001702
+    gsp: 0x0004013000001c02
+    hid: 0x0004013000001d02
+    ro: 0x0004013000003702
