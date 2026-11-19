@@ -1,4 +1,8 @@
 #pragma GCC diagnostic ignored "-Wmisleading-indentation"
+#pragma GCC diagnostic ignored "-Wformat"
+#pragma GCC diagnostic ignored "-Wformat-extra-args"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-variable"
 #include <3ds.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,7 +45,7 @@ static int needConfirm = 0;
 static int needRedraw = 1;
 
 static void setMsg(const char *m, const char *color) {
-    snprintf(msg, sizeof(msg), "%.120s", m);
+    snprintf(msg, sizeof(msg), "%s", m);
     snprintf(msgColor, sizeof(msgColor), "%s", color);
     needRedraw = 1;
 }
@@ -61,10 +65,10 @@ static u32 readLE32(unsigned char *p) {
 }
 
 static void writeLE32(unsigned char *p, u32 v) {
-    p[0] = v & 0xFF;
-    p[1] = (v >> 8) & 0xFF;
-    p[2] = (v >> 16) & 0xFF;
-    p[3] = (v >> 24) & 0xFF;
+    p[0] = (unsigned char)(v & 0xFF);
+    p[1] = (unsigned char)((v >> 8) & 0xFF);
+    p[2] = (unsigned char)((v >> 16) & 0xFF);
+    p[3] = (unsigned char)((v >> 24) & 0xFF);
 }
 
 static int findMainFile(const char *folder, char *outFile, long *outSize) {
@@ -72,7 +76,7 @@ static int findMainFile(const char *folder, char *outFile, long *outSize) {
     if (!d) {
         return 0;
     }
-    struct dirent *e;
+    struct dirent *e = NULL;
     char best[MAX_PATH] = "";
     long bestSize = 0;
     while ((e = readdir(d)) != NULL) {
@@ -92,7 +96,7 @@ static int findMainFile(const char *folder, char *outFile, long *outSize) {
         if ((strstr(e->d_name, "savedata") != NULL) || (strstr(e->d_name, "TL.") != NULL) || (strstr(e->d_name, "main") != NULL) || (strstr(e->d_name, "SAVE") != NULL)) {
             isSave = 1;
         }
-        if ((st.st_size > bestSize) && (isSave || (st.st_size > 50000))) {
+        if ((st.st_size > bestSize) && ((isSave == 1) || (st.st_size > 50000))) {
             bestSize = st.st_size;
             snprintf(best, sizeof(best), "%s", full);
         }
@@ -117,7 +121,7 @@ static int addSave(const char *folder, const char *displayName) {
     }
     char mainFile[MAX_PATH];
     long sz = 0;
-    if (!findMainFile(folder, mainFile, &sz)) {
+    if (findMainFile(folder, mainFile, &sz) == 0) {
         return 0;
     }
     if (sz < 10000) {
@@ -125,11 +129,11 @@ static int addSave(const char *folder, const char *displayName) {
     }
     SaveInfo *s = &saves[saveCount];
     memset(s, 0, sizeof(*s));
-    snprintf(s->name, sizeof(s->name), "%.60s", displayName);
+    snprintf(s->name, sizeof(s->name), "%s", displayName);
     snprintf(s->folder, sizeof(s->folder), "%s", folder);
     snprintf(s->file, sizeof(s->file), "%s", mainFile);
     s->size = sz;
-    snprintf(s->status, sizeof(s->status), "OK");
+    snprintf(s->status, sizeof(s->status), "%s", "OK");
     s->moneyOffset = -1;
     saveCount++;
     return 1;
@@ -151,7 +155,7 @@ static void scanSaves(void) {
         if (!d) {
             continue;
         }
-        struct dirent *e;
+        struct dirent *e = NULL;
         while ((e = readdir(d)) != NULL) {
             if (e->d_name[0] == '.') {
                 continue;
@@ -159,13 +163,13 @@ static void scanSaves(void) {
             char sub[MAX_PATH];
             snprintf(sub, sizeof(sub), "%s/%s", bases[b], e->d_name);
             struct stat st;
-            if ((stat(sub, &st) != 0) || !S_ISDIR(st.st_mode)) {
+            if ((stat(sub, &st) != 0) || (S_ISDIR(st.st_mode) == 0)) {
                 continue;
             }
-            if (!addSave(sub, e->d_name)) {
+            if (addSave(sub, e->d_name) == 0) {
                 DIR *d2 = opendir(sub);
                 if (d2) {
-                    struct dirent *e2;
+                    struct dirent *e2 = NULL;
                     while ((e2 = readdir(d2)) != NULL) {
                         if (e2->d_name[0] == '.') {
                             continue;
@@ -173,7 +177,7 @@ static void scanSaves(void) {
                         char sub2[MAX_PATH];
                         snprintf(sub2, sizeof(sub2), "%s/%s", sub, e2->d_name);
                         struct stat st2;
-                        if ((stat(sub2, &st2) == 0) && S_ISDIR(st2.st_mode)) {
+                        if ((stat(sub2, &st2) == 0) && (S_ISDIR(st2.st_mode) != 0)) {
                             addSave(sub2, e2->d_name);
                         }
                     }
@@ -185,7 +189,7 @@ static void scanSaves(void) {
     }
     DIR *d = opendir("sdmc:/3ds/Checkpoint/saves");
     if (d) {
-        struct dirent *e;
+        struct dirent *e = NULL;
         while ((e = readdir(d)) != NULL) {
             if (e->d_name[0] == '.') {
                 continue;
@@ -194,12 +198,12 @@ static void scanSaves(void) {
                 continue;
             }
             char g[MAX_PATH];
-            snprintf(g, sizeof(g), "sdmc:/3ds/Checkpoint/saves/%s", e->d_name);
+            snprintf(g, sizeof(g), "%s/%s", "sdmc:/3ds/Checkpoint/saves", e->d_name);
             DIR *dg = opendir(g);
             if (!dg) {
                 continue;
             }
-            struct dirent *eb;
+            struct dirent *eb = NULL;
             while ((eb = readdir(dg)) != NULL) {
                 if (eb->d_name[0] == '.') {
                     continue;
@@ -207,7 +211,7 @@ static void scanSaves(void) {
                 char bk[MAX_PATH];
                 snprintf(bk, sizeof(bk), "%s/%s", g, eb->d_name);
                 struct stat stb;
-                if ((stat(bk, &stb) == 0) && S_ISDIR(stb.st_mode)) {
+                if ((stat(bk, &stb) == 0) && (S_ISDIR(stb.st_mode) != 0)) {
                     addSave(bk, eb->d_name);
                 }
             }
@@ -220,7 +224,7 @@ static void scanSaves(void) {
 static void readMoneyFor(SaveInfo *s) {
     FILE *f = fopen(s->file, "rb");
     if (!f) {
-        snprintf(s->status, sizeof(s->status), "ERRO ABRIR");
+        snprintf(s->status, sizeof(s->status), "%s", "ERRO ABRIR");
         return;
     }
     fseek(f, 0, SEEK_END);
@@ -228,19 +232,19 @@ static void readMoneyFor(SaveInfo *s) {
     fseek(f, 0, SEEK_SET);
     if ((sz < 10000) || (sz > 8000000)) {
         fclose(f);
-        snprintf(s->status, sizeof(s->status), "TAMANHO ESTRANHO");
+        snprintf(s->status, sizeof(s->status), "%s", "TAMANHO ESTRANHO");
         return;
     }
-    unsigned char *buf = (unsigned char*)malloc(sz);
+    unsigned char *buf = (unsigned char*)malloc((size_t)sz);
     if (!buf) {
         fclose(f);
-        snprintf(s->status, sizeof(s->status), "SEM MEMORIA");
+        snprintf(s->status, sizeof(s->status), "%s", "SEM MEMORIA");
         return;
     }
-    if (fread(buf, 1, sz, f) != (size_t)sz) {
+    if (fread(buf, 1, (size_t)sz, f) != (size_t)sz) {
         free(buf);
         fclose(f);
-        snprintf(s->status, sizeof(s->status), "ERRO LER");
+        snprintf(s->status, sizeof(s->status), "%s", "ERRO LER");
         return;
     }
     fclose(f);
@@ -250,12 +254,12 @@ static void readMoneyFor(SaveInfo *s) {
     int copies = 0;
     for (long off = sz - 4; off >= start; off -= 4) {
         u32 v = readLE32(buf + off);
-        if ((v > 0) && (v <= MONEY_MAX_CENTS)) {
+        if ((v > 0) && (v <= (u32)MONEY_MAX_CENTS)) {
             u32 nxt = 0;
             if ((off + 4) < sz) {
                 nxt = readLE32(buf + off + 4);
             }
-            if (nxt == 0xFFFFFFFF) {
+            if (nxt == (u32)0xFFFFFFFF) {
                 continue;
             }
             foundOff = off;
@@ -273,10 +277,10 @@ static void readMoneyFor(SaveInfo *s) {
         s->moneyOffset = foundOff;
         s->moneyFound = 1;
         s->moneyCopies = copies;
-        snprintf(s->status, sizeof(s->status), "OK");
+        snprintf(s->status, sizeof(s->status), "%s", "OK");
     } else {
         s->moneyFound = 0;
-        snprintf(s->status, sizeof(s->status), "DINH. NAO ACHADO");
+        snprintf(s->status, sizeof(s->status), "%s", "DINH. NAO ACHADO");
     }
     free(buf);
 }
@@ -310,13 +314,13 @@ static int doBackup(SaveInfo *s) {
 }
 
 static int editMoney(SaveInfo *s) {
-    if (!s->moneyFound) {
+    if (s->moneyFound == 0) {
         return -2;
     }
-    if (s->money == MONEY_MAX_CENTS) {
+    if (s->money == (u32)MONEY_MAX_CENTS) {
         return 1;
     }
-    if (!doBackup(s)) {
+    if (doBackup(s) == 0) {
         return -3;
     }
     FILE *f = fopen(s->file, "r+b");
@@ -326,12 +330,12 @@ static int editMoney(SaveInfo *s) {
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
-    unsigned char *buf = (unsigned char*)malloc(sz);
+    unsigned char *buf = (unsigned char*)malloc((size_t)sz);
     if (!buf) {
         fclose(f);
         return -5;
     }
-    if (fread(buf, 1, sz, f) != (size_t)sz) {
+    if (fread(buf, 1, (size_t)sz, f) != (size_t)sz) {
         free(buf);
         fclose(f);
         return -6;
@@ -341,16 +345,16 @@ static int editMoney(SaveInfo *s) {
     long start = (sz > 131072) ? (sz - 131072) : 0;
     for (long off = start; off + 4 <= sz; off += 4) {
         if (readLE32(buf + off) == old) {
-            writeLE32(buf + off, MONEY_MAX_CENTS);
+            writeLE32(buf + off, (u32)MONEY_MAX_CENTS);
             changed++;
         }
     }
     if ((changed == 0) && (s->moneyOffset >= 0)) {
-        writeLE32(buf + s->moneyOffset, MONEY_MAX_CENTS);
+        writeLE32(buf + s->moneyOffset, (u32)MONEY_MAX_CENTS);
         changed = 1;
     }
     fseek(f, 0, SEEK_SET);
-    if (fwrite(buf, 1, sz, f) != (size_t)sz) {
+    if (fwrite(buf, 1, (size_t)sz, f) != (size_t)sz) {
         free(buf);
         fclose(f);
         return -7;
@@ -358,7 +362,7 @@ static int editMoney(SaveInfo *s) {
     fclose(f);
     free(buf);
     readMoneyFor(s);
-    if (s->money == MONEY_MAX_CENTS) {
+    if (s->money == (u32)MONEY_MAX_CENTS) {
         return 0;
     }
     return -8;
@@ -368,20 +372,30 @@ static void drawUI(void) {
     PrintConsole *top = consoleGet(GFX_TOP);
     PrintConsole *bot = consoleGet(GFX_BOTTOM);
     consoleSelect(top);
-    printf("\x1b[2J");
-    printf(COL_CYAN "Tomodachi Life - Save Editor V4\n");
-    printf(COL_MAGENTA "por Darkness Metal\n");
-    printf(COL_GRAY "----------------------------------------\n");
+    printf("%s", "\x1b[2J");
+    printf("%s", COL_CYAN);
+    printf("%s", "Tomodachi Life - Save Editor V4\n");
+    printf("%s", COL_MAGENTA);
+    printf("%s", "por Darkness Metal\n");
+    printf("%s", COL_GRAY);
+    printf("%s", "----------------------------------------\n");
     if (saveCount == 0) {
-        printf(COL_RED "NENHUM SAVE ACHADO!\n");
-        printf(COL_WHITE "1. Abra o Checkpoint\n");
-        printf(COL_WHITE "2. Faca backup do Tomodachi\n");
-        printf(COL_WHITE "3. Aperte X pra atualizar\n");
-        printf(COL_GRAY "Procurado em:\n");
-        printf(COL_GRAY "3ds/Checkpoint/saves/...\n");
+        printf("%s", COL_RED);
+        printf("%s", "NENHUM SAVE ACHADO!\n");
+        printf("%s", COL_WHITE);
+        printf("%s", "1. Abra o Checkpoint\n");
+        printf("%s", "2. Faca backup do Tomodachi\n");
+        printf("%s", "3. Aperte X pra atualizar\n");
+        printf("%s", COL_GRAY);
+        printf("%s", "Procurado em:\n");
+        printf("%s", "3ds/Checkpoint/saves/...\n");
     } else {
-        printf(COL_WHITE "Saves encontrados: " COL_GREEN "%d\n", saveCount);
-        printf(COL_GRAY "----------------------------------------\n");
+        printf("%s", COL_WHITE);
+        printf("%s", "Saves encontrados: ");
+        printf("%s", COL_GREEN);
+        printf("%d\n", (int)saveCount);
+        printf("%s", COL_GRAY);
+        printf("%s", "----------------------------------------\n");
         for (int i = 0; i < saveCount; i++) {
             SaveInfo *s = &saves[i];
             char nameT[44];
@@ -394,52 +408,108 @@ static void drawUI(void) {
             if (i == selected) {
                 selCol = COL_GREEN;
             }
-            printf("%s%c [%d] %s\n", selCol, mark, i + 1, nameT);
-            if (s->moneyFound) {
-                printf(COL_WHITE "    Tamanho: " COL_CYAN "%ld KB " COL_WHITE "| " COL_YELLOW "[$] " COL_YELLOW "%u" COL_WHITE " cents\n", s->size / 1024, s->money);
-                printf(COL_WHITE "    Copias: " COL_CYAN "%d " COL_WHITE "| Status: ", s->moneyCopies);
-                if (s->money == MONEY_MAX_CENTS) {
-                    printf(COL_GREEN "JA NO MAX!\n");
+            printf("%s%c [%d] %s\n", selCol, (int)mark, (int)(i + 1), nameT);
+            if (s->moneyFound != 0) {
+                printf("%s", COL_WHITE);
+                printf("%s", "    Tamanho: ");
+                printf("%s", COL_CYAN);
+                printf("%ld KB ", (long)(s->size / 1024));
+                printf("%s", COL_WHITE);
+                printf("%s", "| ");
+                printf("%s", COL_YELLOW);
+                printf("%s", "[$] ");
+                printf("%s", COL_YELLOW);
+                printf("%u", (unsigned int)s->money);
+                printf("%s", COL_WHITE);
+                printf("%s", " cents\n");
+                printf("%s", COL_WHITE);
+                printf("%s", "    Copias: ");
+                printf("%s", COL_CYAN);
+                printf("%d ", (int)s->moneyCopies);
+                printf("%s", COL_WHITE);
+                printf("%s", "| Status: ");
+                if (s->money == (u32)MONEY_MAX_CENTS) {
+                    printf("%s", COL_GREEN);
+                    printf("%s", "JA NO MAX!\n");
                 } else {
-                    printf(COL_GREEN "%s\n", s->status);
+                    printf("%s", COL_GREEN);
+                    printf("%s\n", s->status);
                 }
             } else {
-                printf(COL_WHITE "    Tamanho: " COL_CYAN "%ld KB\n", s->size / 1024);
-                printf(COL_RED "    Status: %s\n", s->status);
+                printf("%s", COL_WHITE);
+                printf("%s", "    Tamanho: ");
+                printf("%s", COL_CYAN);
+                printf("%ld KB\n", (long)(s->size / 1024));
+                printf("%s", COL_RED);
+                printf("%s", "    Status: ");
+                printf("%s\n", s->status);
             }
             char fileT[40];
             truncLine(fileT, s->file, 36);
-            printf(COL_GRAY "    Arq: %s\n", fileT);
+            printf("%s", COL_GRAY);
+            printf("%s", "    Arq: ");
+            printf("%s\n", fileT);
         }
     }
-    printf(COL_GRAY "----------------------------------------\n");
-    if (needConfirm) {
-        printf(COL_YELLOW "Aperte A DE NOVO pra confirmar!\n");
+    printf("%s", COL_GRAY);
+    printf("%s", "----------------------------------------\n");
+    if (needConfirm != 0) {
+        printf("%s", COL_YELLOW);
+        printf("%s", "Aperte A DE NOVO pra confirmar!\n");
     } else {
-        printf(COL_WHITE "Use " COL_CYAN "Cima/Baixo" COL_WHITE " pra escolher\n");
+        printf("%s", COL_WHITE);
+        printf("%s", "Use ");
+        printf("%s", COL_CYAN);
+        printf("%s", "Cima/Baixo");
+        printf("%s", COL_WHITE);
+        printf("%s", " pra escolher\n");
     }
     consoleSelect(bot);
-    printf("\x1b[2J");
-    printf(COL_CYAN "--- CONTROLES ---\n");
-    printf(COL_GREEN "A" COL_WHITE " - Editar dinheiro pra " COL_YELLOW "[$] 999.999\n");
-    printf(COL_CYAN "B" COL_WHITE " - Fazer backup .bak\n");
-    printf(COL_YELLOW "X" COL_WHITE " - Atualizar lista\n");
-    printf(COL_MAGENTA "Y" COL_WHITE " - Restaurar backup\n");
-    printf(COL_RED "START" COL_WHITE " - Sair\n");
-    printf(COL_GRAY "--------------------------------------\n");
-    printf(COL_WHITE "Selecionado: ");
+    printf("%s", "\x1b[2J");
+    printf("%s", COL_CYAN);
+    printf("%s", "--- CONTROLES ---\n");
+    printf("%s", COL_GREEN);
+    printf("%s", "A");
+    printf("%s", COL_WHITE);
+    printf("%s", " - Editar dinheiro pra ");
+    printf("%s", COL_YELLOW);
+    printf("%s", "[$] 999.999\n");
+    printf("%s", COL_CYAN);
+    printf("%s", "B");
+    printf("%s", COL_WHITE);
+    printf("%s", " - Fazer backup .bak\n");
+    printf("%s", COL_YELLOW);
+    printf("%s", "X");
+    printf("%s", COL_WHITE);
+    printf("%s", " - Atualizar lista\n");
+    printf("%s", COL_MAGENTA);
+    printf("%s", "Y");
+    printf("%s", COL_WHITE);
+    printf("%s", " - Restaurar backup\n");
+    printf("%s", COL_RED);
+    printf("%s", "START");
+    printf("%s", COL_WHITE);
+    printf("%s", " - Sair\n");
+    printf("%s", COL_GRAY);
+    printf("%s", "--------------------------------------\n");
+    printf("%s", COL_WHITE);
+    printf("%s", "Selecionado: ");
     if (saveCount > 0) {
-        printf(COL_GREEN "%s\n", saves[selected].name);
+        printf("%s", COL_GREEN);
+        printf("%s\n", saves[selected].name);
     } else {
-        printf(COL_RED "nenhum\n");
+        printf("%s", COL_RED);
+        printf("%s", "nenhum\n");
     }
     printf("%s%s\n", msgColor, msg);
-    printf(COL_RESET "");
+    printf("%s", COL_RESET);
     gfxFlushBuffers();
     gspWaitForVBlank();
 }
 
 int main(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
     gfxInitDefault();
     consoleInit(GFX_TOP, NULL);
     consoleInit(GFX_BOTTOM, NULL);
@@ -455,32 +525,32 @@ int main(int argc, char **argv) {
         hidScanInput();
         u32 kDown = hidKeysDown();
         int acted = 0;
-        if (kDown & KEY_DUP) {
+        if ((kDown & KEY_DUP) != 0) {
             if (saveCount > 0) {
                 selected = (selected + saveCount - 1) % saveCount;
             }
             needConfirm = 0;
             acted = 1;
         }
-        if (kDown & KEY_DDOWN) {
+        if ((kDown & KEY_DDOWN) != 0) {
             if (saveCount > 0) {
                 selected = (selected + 1) % saveCount;
             }
             needConfirm = 0;
             acted = 1;
         }
-        if (kDown & KEY_X) {
+        if ((kDown & KEY_X) != 0) {
             scanSaves();
             refreshAllMoney();
             setMsg("Lista atualizada.", COL_CYAN);
             needConfirm = 0;
             acted = 1;
         }
-        if (kDown & KEY_A) {
+        if ((kDown & KEY_A) != 0) {
             if (saveCount == 0) {
                 setMsg("Sem save pra editar.", COL_RED);
                 acted = 1;
-            } else if (!needConfirm) {
+            } else if (needConfirm == 0) {
                 needConfirm = 1;
                 setMsg("Aperte A de novo pra confirmar!", COL_YELLOW);
                 acted = 1;
@@ -508,9 +578,9 @@ int main(int argc, char **argv) {
                 acted = 1;
             }
         }
-        if (kDown & KEY_B) {
+        if ((kDown & KEY_B) != 0) {
             if (saveCount > 0) {
-                if (doBackup(&saves[selected])) {
+                if (doBackup(&saves[selected]) != 0) {
                     setMsg("Backup .bak criado!", COL_GREEN);
                 } else {
                     setMsg("Falha no backup.", COL_RED);
@@ -521,7 +591,7 @@ int main(int argc, char **argv) {
             needConfirm = 0;
             acted = 1;
         }
-        if (kDown & KEY_Y) {
+        if ((kDown & KEY_Y) != 0) {
             if (saveCount > 0) {
                 SaveInfo *s = &saves[selected];
                 char bak[MAX_PATH + 16];
@@ -550,10 +620,10 @@ int main(int argc, char **argv) {
             needConfirm = 0;
             acted = 1;
         }
-        if (kDown & KEY_START) {
+        if ((kDown & KEY_START) != 0) {
             break;
         }
-        if (acted || needRedraw) {
+        if ((acted != 0) || (needRedraw != 0)) {
             drawUI();
             needRedraw = 0;
         }
