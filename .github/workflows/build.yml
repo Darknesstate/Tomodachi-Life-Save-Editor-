@@ -48,43 +48,31 @@ jobs:
       - name: Get tools 4 tentativas
         run: |
           mkdir -p /tmp/tools /tmp/bt || true
-          echo "== makerom tentativa 1 BootNTR raw =="
           curl -L --fail -o /tmp/tools/makerom https://raw.githubusercontent.com/44670/BootNTR/master/lib/ctrcommon/tools/makerom-linux && ls -lh /tmp/tools/makerom || echo "tentativa 1 falhou"
           if [ ! -s /tmp/tools/makerom ] || [ $(wc -c < /tmp/tools/makerom) -lt 10000 ]; then
-            echo "== makerom tentativa 2 open-supaplex raw =="
             curl -L --fail -o /tmp/tools/makerom https://raw.githubusercontent.com/sergiou87/open-supaplex/master/3ds/tools/makerom-linux && ls -lh /tmp/tools/makerom || echo "tentativa 2 falhou"
           fi
           if [ ! -s /tmp/tools/makerom ] || [ $(wc -c < /tmp/tools/makerom) -lt 10000 ]; then
-            echo "== makerom tentativa 3 API =="
             MAKEROM_URL=$(curl -s https://api.github.com/repos/3DSGuy/Project_CTR/releases/latest | grep browser_download_url | grep ubuntu | head -n 1 | cut -d '"' -f 4) || true
-            echo "URL $MAKEROM_URL"
             curl -L --fail -o /tmp/tools/makerom "$MAKEROM_URL" || echo "tentativa 3 falhou"
           fi
           if [ ! -s /tmp/tools/makerom ] || [ $(wc -c < /tmp/tools/makerom) -lt 10000 ]; then
-            echo "== makerom tentativa 4 release fixo =="
             curl -L --fail -o /tmp/tools/makerom https://github.com/3DSGuy/Project_CTR/releases/download/v0.19.0/makerom-ubuntu_x86_64 || echo "tentativa 4 falhou"
           fi
           chmod +x /tmp/tools/makerom || true
           ls -lh /tmp/tools/makerom || true
-          file /tmp/tools/makerom || true
-          echo "== bannertool tentativa 1 BootNTR raw =="
-          curl -L --fail -o /tmp/tools/bannertool https://raw.githubusercontent.com/44670/BootNTR/master/lib/ctrcommon/tools/bannertool-linux && ls -lh /tmp/tools/bannertool || echo "tentativa 1 falhou"
+          curl -L --fail -o /tmp/tools/bannertool https://raw.githubusercontent.com/44670/BootNTR/master/lib/ctrcommon/tools/bannertool-linux && ls -lh /tmp/tools/bannertool || echo "banner 1 falhou"
           if [ ! -s /tmp/tools/bannertool ] || [ $(wc -c < /tmp/tools/bannertool) -lt 10000 ]; then
-            echo "== bannertool tentativa 2 open-supaplex raw =="
-            curl -L --fail -o /tmp/tools/bannertool https://raw.githubusercontent.com/sergiou87/open-supaplex/master/3ds/tools/bannertool-linux && ls -lh /tmp/tools/bannertool || echo "tentativa 2 falhou"
+            curl -L --fail -o /tmp/tools/bannertool https://raw.githubusercontent.com/sergiou87/open-supaplex/master/3ds/tools/bannertool-linux && ls -lh /tmp/tools/bannertool || echo "banner 2 falhou"
           fi
           if [ ! -s /tmp/tools/bannertool ] || [ $(wc -c < /tmp/tools/bannertool) -lt 10000 ]; then
-            echo "== bannertool tentativa 3 API zip =="
             BANNER_URL=$(curl -s https://api.github.com/repos/Epicpkmn11/bannertool/releases/latest | grep browser_download_url | grep -i zip | head -n 1 | cut -d '"' -f 4) || true
-            echo "URL $BANNER_URL"
-            curl -L --fail -o /tmp/bannertool.zip "$BANNER_URL" || curl -L --fail -o /tmp/bannertool.zip https://github.com/Epicpkmn11/bannertool/releases/download/v1.2.0/bannertool.zip || echo "tentativa 3 falhou"
+            curl -L --fail -o /tmp/bannertool.zip "$BANNER_URL" || curl -L --fail -o /tmp/bannertool.zip https://github.com/Epicpkmn11/bannertool/releases/download/v1.2.0/bannertool.zip || echo "banner 3 falhou"
             unzip -o /tmp/bannertool.zip -d /tmp/bt || true
             find /tmp/bt -type f -iname "*bannertool*" -exec cp {} /tmp/tools/bannertool \; || true
           fi
           chmod +x /tmp/tools/bannertool || true
           ls -lh /tmp/tools/ || true
-          file /tmp/tools/bannertool || true
-          file /tmp/tools/makerom || true
 
       - name: Make som Umbreon Black 2
         run: |
@@ -94,7 +82,7 @@ jobs:
               shutil.copy("umbreon_cry.wav", "banner_sound.wav")
               print("usando seu umbreon_cry.wav de Black 2")
           else:
-              print("sem umbreon_cry.wav, gerando som shiny sintetizado")
+              print("sem umbreon_cry.wav, gerando som shiny")
               w = wave.open('banner_sound.wav','wb')
               w.setnchannels(2)
               w.setsampwidth(2)
@@ -124,16 +112,181 @@ jobs:
             bannertool makebanner -i $BANNER_IMG -a banner_sound.wav -o banner.bnr || echo "bannertool falhou"
             ls -lh banner.bnr || true
           else
-            echo "ERRO: sem bannertool, nao da pra fazer banner.bnr"
+            echo "ERRO: sem bannertool"
             exit 1
           fi
 
-      - name: Make CIA
+      - name: Make CIA com RSF completo
         run: |
           export PATH="/tmp/tools:$PATH"
           if [ ! -x /tmp/tools/makerom ]; then echo "ERRO: sem makerom"; exit 1; fi
           if [ ! -f banner.bnr ]; then echo "ERRO: sem banner.bnr"; exit 1; fi
-          printf 'BasicInfo:\n  Title : "Tomodachi Life Save Editor"\n  CompanyCode : "00"\n  ProductCode : "CTR-P-TLSE"\n  ContentType : "Application"\nTitleInfo:\n  UniqueId : 0x01F001\n  Category : "Application"\nOption:\n  UseOnSD : true\n  EnableCrypt : false\n  EnableCompress : true\n' > game.rsf
+          cat > game.rsf <<'EOF'
+          BasicInfo:
+            Title : "Tomodachi Life Save Editor"
+            CompanyCode : "00"
+            ProductCode : "CTR-P-TLSE"
+            ContentType : "Application"
+          TitleInfo:
+            Category : "Application"
+            UniqueId : 0x01F001
+          Option:
+            UseOnSD : true
+            FreeProductCode : true
+            EnableCrypt : false
+            EnableCompress : true
+          AccessControlInfo:
+            CoreVersion : 2
+            DescVersion : 2
+            ReleaseKernelMajor : "02"
+            ReleaseKernelMinor : "33"
+            UseExtSaveData : false
+            FileSystemAccess:
+              - DirectSdmc
+            MemoryType : Application
+            SystemMode : 64MB
+            IdealProcessor : 0
+            AffinityMask : 1
+            Priority : 16
+            MaxCpu : 0
+            HandleTableSize : 0x200
+            DisableDebug : false
+            EnableForceDebug : false
+            CanWriteSharedPage : true
+            CanUsePrivilegedPriority : false
+            CanUseNonAlphabetAndNumber : true
+            PermitMainFunctionArgument : true
+            CanShareDeviceMemory : true
+            RunnableOnSleep : false
+            SpecialMemoryArrange : true
+            SystemModeExt : 124MB
+            CpuSpeed : 804MHz
+            EnableL2Cache : true
+            CanAccessCore2 : true
+            IORegisterMapping:
+              - 1ff00000-1ff7ffff
+            MemoryMapping:
+              - 1f000000-1f5fffff:r
+            SystemCallAccess:
+              ArbitrateAddress: 34
+              Break: 60
+              CancelTimer: 28
+              ClearEvent: 25
+              ClearTimer: 29
+              CloseHandle: 35
+              ConnectToPort: 45
+              ControlMemory: 1
+              CreateAddressArbiter: 33
+              CreateEvent: 23
+              CreateMemoryBlock: 30
+              CreateMutex: 19
+              CreateSemaphore: 21
+              CreateThread: 8
+              CreateTimer: 26
+              DuplicateHandle: 39
+              ExitProcess: 3
+              ExitThread: 9
+              GetCurrentProcessorNumber: 17
+              GetHandleInfo: 41
+              GetProcessId: 53
+              GetProcessIdOfThread: 54
+              GetProcessIdealProcessor: 6
+              GetProcessInfo: 43
+              GetResourceLimit: 56
+              GetResourceLimitCurrentValues: 58
+              GetResourceLimitLimitValues: 57
+              GetSystemInfo: 42
+              GetSystemTick: 40
+              GetThreadContext: 59
+              GetThreadId: 55
+              GetThreadIdealProcessor: 15
+              GetThreadInfo: 44
+              GetThreadPriority: 11
+              MapMemoryBlock: 31
+              OutputDebugString: 61
+              QueryMemory: 2
+              ReleaseMutex: 20
+              ReleaseSemaphore: 22
+              SendSyncRequest1: 46
+              SendSyncRequest2: 47
+              SendSyncRequest3: 48
+              SendSyncRequest4: 49
+              SendSyncRequest: 50
+              SetThreadPriority: 12
+              SetTimer: 27
+              SignalEvent: 24
+              SleepThread: 10
+              UnmapMemoryBlock: 32
+              WaitSynchronization1: 36
+              WaitSynchronizationN: 37
+              Backdoor: 123
+            ServiceAccessControl:
+              - cfg:u
+              - fs:USER
+              - gsp::Gpu
+              - hid:USER
+              - ndm:u
+              - pxi:dev
+              - APT:U
+              - ac:u
+              - act:u
+              - am:net
+              - boss:U
+              - cam:u
+              - cecd:u
+              - csnd:SND
+              - frd:u
+              - http:C
+              - ir:USER
+              - ir:u
+              - ir:rst
+              - ldr:ro
+              - mic:u
+              - news:u
+              - nfc:u
+              - nim:aoc
+              - nwm::UDS
+              - ptm:u
+              - qtm:u
+              - soc:U
+              - ssl:C
+              - y2r:u
+          SystemControlInfo:
+            SaveDataSize: 0K
+            RemasterVersion: 0
+            StackSize: 0x40000
+          Dependency:
+            ac: 0x0004013000002402
+            am: 0x0004013000001502
+            boss: 0x0004013000003402
+            camera: 0x0004013000001602
+            cecd: 0x0004013000002602
+            cfg: 0x0004013000001702
+            codec: 0x0004013000001802
+            csnd: 0x0004013000002702
+            dlp: 0x0004013000002802
+            dsp: 0x0004013000001a02
+            friends: 0x0004013000003202
+            gpio: 0x0004013000001b02
+            gsp: 0x0004013000001c02
+            hid: 0x0004013000001d02
+            http: 0x0004013000002902
+            i2c: 0x0004013000001e02
+            ir: 0x0004013000003302
+            mcu: 0x0004013000001f02
+            mic: 0x0004013000002002
+            ndm: 0x0004013000002b02
+            news: 0x0004013000003502
+            nim: 0x0004013000002c02
+            nwm: 0x0004013000002d02
+            pdn: 0x0004013000002102
+            ps: 0x0004013000003102
+            ptm: 0x0004013000002202
+            ro: 0x0004013000003702
+            socket: 0x0004013000002e02
+            spi: 0x0004013000002302
+            ssl: 0x0004013000002f02
+          EOF
           cat game.rsf || true
           makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.smdh -banner banner.bnr
           ls -lh TomodachiLifeSaveEditor.cia
