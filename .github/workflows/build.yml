@@ -18,10 +18,53 @@ jobs:
           smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max no Tomodachi Life" "Darkness Metal" icon.png TomodachiLifeSaveEditor.smdh
           ls -lh TomodachiLifeSaveEditor.elf TomodachiLifeSaveEditor.3dsx TomodachiLifeSaveEditor.smdh
 
+      - name: Get bannertool and makerom
+        run: |
+          mkdir -p /tmp/tools
+          git clone https://github.com/Steveice10/ctrcommon.git /tmp/ctrcommon
+          ls /tmp/ctrcommon/tools/
+          cp /tmp/ctrcommon/tools/bannertool-linux /tmp/tools/bannertool
+          cp /tmp/ctrcommon/tools/makerom-linux /tmp/tools/makerom
+          chmod +x /tmp/tools/bannertool /tmp/tools/makerom
+          /tmp/tools/bannertool --help || true
+          /tmp/tools/makerom --help || true
+          echo "/tmp/tools" >> $GITHUB_PATH
+
+      - name: Make banner
+        run: |
+          export PATH="/tmp/tools:$PATH"
+          ls -lh banner.png icon.png
+          python3 -c "import wave; w=wave.open('silent.wav','wb'); w.setnchannels(2); w.setsampwidth(2); w.setframerate(44100); w.writeframes(b'\x00\x00\x00\x00'*44100); w.close()"
+          bannertool makebanner -i banner.png -a silent.wav -o banner.bnr
+          ls -lh banner.bnr
+
+      - name: Make CIA
+        run: |
+          export PATH="/tmp/tools:$PATH"
+          cat > game.rsf <<'EOF'
+          BasicInfo:
+            Title : "Tomodachi Life Save Editor"
+            CompanyCode : "00"
+            ProductCode : "CTR-P-TLSE"
+            ContentType : "Application"
+          TitleInfo:
+            UniqueId : 0x01F001
+            Category : 0
+          Option:
+            UseOnSD : true
+            EnableCrypt : false
+            EnableCompress : true
+            FreeProductCode : true
+            MediaFootSize : 0x00000000
+          EOF
+          makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.smdh -banner banner.bnr
+          ls -lh TomodachiLifeSaveEditor.cia
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: TomodachiLifeSaveEditor-3DSX
+          name: TomodachiLifeSaveEditor
           path: |
             TomodachiLifeSaveEditor.3dsx
             TomodachiLifeSaveEditor.smdh
+            TomodachiLifeSaveEditor.cia
