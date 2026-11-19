@@ -20,8 +20,13 @@ jobs:
           ls -lh assets/
       - name: Build 3dsx
         run: make
+      - name: Instalar bannertool e makerom
+        run: |
+          dkp-pacman -Sy --noconfirm 3dstools
+          ls -lh /opt/devkitpro/tools/bin/bannertool /opt/devkitpro/tools/bin/makerom
       - name: Gerar banner e CIA
         run: |
+          export PATH=$PATH:/opt/devkitpro/tools/bin
           ls -lh
           ls -lh assets/
           bannertool makebanner -i assets/banner.png -a assets/silencio.wav -o banner.bnr
