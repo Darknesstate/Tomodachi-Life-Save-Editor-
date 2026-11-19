@@ -15,28 +15,88 @@ jobs:
       - name: Build V4
         run: make
 
-      - name: Baixar ferramentas
-        run: |
-          mkdir -p tools
-          wget -O tools/bannertool.tar.gz https://github.com/Steveice10/bannertool/releases/download/1.2.0/bannertool-1.2.0-linux.tar.gz || true
-          tar -xzf tools/bannertool.tar.gz -C tools || true
-          chmod +x tools/bannertool || true
-          wget -O tools/makerom https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-v0.18.4-ubuntu_x86_64 || true
-          chmod +x tools/makerom || true
-
-      - name: Fazer CIA
+      - name: Fazer CIA com Auto-Cura
         run: |
           set -e
+          export PATH="/opt/devkitpro/tools/bin:$PATH"
+          echo "=== Arquivos ==="
+          ls -l
           ELF_FILE=$(ls *.elf | head -n 1)
+          echo "ELF: $ELF_FILE"
+          if [ -z "$ELF_FILE" ]; then echo "ERRO: nenhum .elf achado"; exit 1; fi
+          if command -v bannertool >/dev/null 2>&1; then BT="bannertool"; elif [ -x "/opt/devkitpro/tools/bin/bannertool" ]; then BT="/opt/devkitpro/tools/bin/bannertool"; else BT="bannertool"; fi
+          if command -v makerom >/dev/null 2>&1; then MR="makerom"; elif [ -x "/opt/devkitpro/tools/bin/makerom" ]; then MR="/opt/devkitpro/tools/bin/makerom"; else MR="makerom"; fi
+          echo "bannertool: $BT"
+          echo "makerom: $MR"
+          pip install Pillow -q || pip3 install Pillow -q || true
+          python3 << 'PY'
+          import struct, zlib
+          def read_size(p):
+            try:
+              d=open(p,'rb').read()
+              w,h=struct.unpack('>II', d[16:24])
+              return w,h
+            except:
+              return None
+          def make_png(w,h,r,g,b,p):
+            def ch(t,d):
+              c=struct.pack('>I',len(d))+t+d
+              return c+struct.pack('>I', zlib.crc32(t+d) & 0xffffffff)
+            sig=b'\x89PNG\r\n\x1a\n'
+            ihdr=struct.pack('>IIBBBBB',w,h,8,2,0,0,0)
+            raw=b''.join(b'\x00'+bytes([r,g,b])*w for _ in range(h))
+            open(p,'wb').write(sig+ch(b'IHDR',ihdr)+ch(b'IDAT',zlib.compress(raw))+ch(b'IEND',b''))
+          def fix(p, want_w, want_h):
+            s=read_size(p)
+            print(p, s)
+            if s is None:
+              print("criando", p)
+              make_png(want_w, want_h, 30,0,60, p)
+              return
+            if s[0]==want_w and s[1]==want_h:
+              print("tamanho OK", p)
+              return
+            print("tamanho errado, tentando redimensionar", p)
+            try:
+              from PIL import Image
+              im=Image.open(p).convert('RGB').resize((want_w, want_h))
+              im.save(p)
+              print("redimensionado com Pillow")
+            except Exception as e:
+              print("Pillow falhou, criando novo", e)
+              make_png(want_w, want_h, 30,0,60, p)
+          fix('banner.png',256,128)
+          fix('icon.png',48,48)
+          PY
           if [ ! -f sound.wav ]; then python3 -c "import wave; w=wave.open('sound.wav','wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050); w.writeframes(b'\x00\x00'*22050); w.close()"; fi
-          ./tools/bannertool makebanner -i banner.png -a sound.wav -o banner.bnr
-          ./tools/bannertool makeicon -i icon.png -o icon.icn
-          ./tools/makerom -f cia -o "Tomodachi Life Save Editor.cia" -elf "$ELF_FILE" -rsf TomodachiReal.rsf -icon icon.icn -banner banner.bnr -exefslogo -target t
+          if [ ! -f TomodachiReal.rsf ]; then cat > TomodachiReal.rsf << 'EOF'
+          BasicInfo:
+            Title: "Tomodachi Life Save Editor"
+            CompanyCode: "00"
+            ProductCode: "CTR-P-TLSE"
+            ContentType: Application
+            Logo: Nintendo
+          TitleInfo:
+            UniqueId: 0xFF3D5
+            Category: Application
+          AccessControlInfo:
+            UseExtSaveData: true
+            ExtSaveDataId: 0xFF3D5
+          SystemControlInfo:
+            SaveDataSize: 1M
+            RemasterVersion: 0
+            StackSize: 0x00040000
+          EOF
+          fi
+          $BT makebanner -i banner.png -a sound.wav -o banner.bnr
+          $BT makeicon -i icon.png -o icon.icn
+          $MR -f cia -o "Tomodachi Life Save Editor.cia" -elf "$ELF_FILE" -rsf TomodachiReal.rsf -icon icon.icn -banner banner.bnr -exefslogo -target t
+          ls -lh *.cia *.3dsx
 
       - name: Subir ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: Tomodachi-V4-CIA
+          name: Tomodachi-V4-【entity-CIA¦canonical_name=CIA】
           path: |
             *.3dsx
-            *.cia
+            *.【entity-cia¦canonical_name=CIA】
