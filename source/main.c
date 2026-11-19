@@ -4,293 +4,197 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <ctype.h>
 
-#define MAX_SAVES 8
-#define MAX_PATH 512
-#define MONEY_OFFSET 0x1E4BB8
-#define MONEY_MAX 999999
+#define MAX_SAVES 6
+char caminhos[MAX_SAVES][256];
+char nomes[MAX_SAVES][32];
+int total = 0;
+int selecionado = 0;
+int dinheiroAtual = 1000;
+int dinheiroNovo = 999999;
+int editandoAtual = 1;
+int precisaRedesenhar = 1;
+char msg[64] = "";
 
-static char g_saves[MAX_SAVES][MAX_PATH];
-static int g_saveCount = 0;
-static u32 g_money = 0;
-static long g_offset = MONEY_OFFSET;
-static int g_found = 0;
-static char g_msg[256] = "";
-
-static int contains_ci(const char *s, const char *needle) {
-    if (!s || !needle) return 0;
-    size_t nl = strlen(needle);
-    for (const char *p = s; *p; p++) {
-        size_t i = 0;
-        for (; i < nl; i++) {
-            if (!p[i]) break;
-            if (tolower((unsigned char)p[i]) != tolower((unsigned char)needle[i])) break;
-        }
-        if (i == nl) return 1;
-    }
+int arquivoExiste(const char *p) {
+    FILE *f = fopen(p, "rb");
+    if (f) { fclose(f); return 1; }
     return 0;
 }
 
-static int ends_with_ci(const char *s, const char *suffix) {
-    if (!s || !suffix) return 0;
-    size_t sl = strlen(s), su = strlen(suffix);
-    if (su > sl) return 0;
-    const char *e = s + sl - su;
-    for (size_t i = 0; i < su; i++) {
-        if (tolower((unsigned char)e[i]) != tolower((unsigned char)suffix[i])) return 0;
+void adicionarSave(const char *caminho, const char *nomeCurto) {
+    if (total >= MAX_SAVES) return;
+    for (int i = 0; i < total; i++) {
+        if (strcmp(caminhos[i], caminho) == 0) return;
     }
-    return 1;
+    strcpy(caminhos[total], caminho);
+    strcpy(nomes[total], nomeCurto);
+    total++;
 }
 
-static int is_save_name(const char *name) {
-    if (!name) return 0;
-    if (contains_ci(name, "savedataarc")) return 1;
-    if (ends_with_ci(name, ".sav")) return 1;
-    if (ends_with_ci(name, ".bin")) return 1;
-    if (ends_with_ci(name, ".txt")) return 1;
-    return 0;
-}
-
-static void add_save(const char *path) {
-    if (g_saveCount >= MAX_SAVES) return;
-    for (int i = 0; i < g_saveCount; i++) if (strcmp(g_saves[i], path) == 0) return;
-    strncpy(g_saves[g_saveCount], path, MAX_PATH - 1);
-    g_saves[g_saveCount][MAX_PATH - 1] = '\0';
-    g_saveCount++;
-}
-
-static void scan_dir(const char *base, int depth) {
-    if (depth > 6) return;
-    DIR *d = opendir(base);
-    if (!d) return;
-    struct dirent *e;
-    while ((e = readdir(d)) != NULL) {
-        if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
-        char full[MAX_PATH];
-        snprintf(full, sizeof(full), "%s/%s", base, e->d_name);
-        struct stat st;
-        if (stat(full, &st) != 0) continue;
-        if (S_ISDIR(st.st_mode)) {
-            scan_dir(full, depth + 1);
-        } else if (S_ISREG(st.st_mode)) {
-            if (is_save_name(e->d_name)) {
-                if (contains_ci(full, "tomodachi") || contains_ci(full, "0008c3") || contains_ci(full, "0008c4") || contains_ci(full, "TomodachiReal")) {
-                    if (!contains_ci(e->d_name, ".bak") && !contains_ci(e->d_name, "backup")) {
-                        add_save(full);
-                    }
-                }
+void buscarSaves() {
+    total = 0;
+    DIR *d = opendir("sdmc:/Checkpoint/saves");
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL) {
+            if (strstr(e->d_name, "Tomodachi") || strstr(e->d_name, "008C3")) {
+                char base[256];
+                snprintf(base, sizeof(base), "sdmc:/Checkpoint/saves/%s", e->d_name);
+                char p1[256], p2[256];
+                snprintf(p1, sizeof(p1), "%s/savedataArc", base);
+                snprintf(p2, sizeof(p2), "%s/savedataArc.txt", base);
+                if (arquivoExiste(p1)) adicionarSave(p1, "Save 1 - Principal");
+                else if (arquivoExiste(p2)) adicionarSave(p2, "Save 1 - Principal");
             }
         }
+        closedir(d);
     }
-    closedir(d);
+    if (arquivoExiste("sdmc:/Checkpoint/saves/0x008C3 Tomodachi Life/savedataArc"))
+        adicionarSave("sdmc:/Checkpoint/saves/0x008C3 Tomodachi Life/savedataArc", "Save 1 - Principal");
+    if (arquivoExiste("sdmc:/Checkpoint/saves/0x008C3 Tomodachi Life/savedataArc.txt"))
+        adicionarSave("sdmc:/Checkpoint/saves/0x008C3 Tomodachi Life/savedataArc.txt", "Save 1 - Principal");
 }
 
-static int find_all_saves(void) {
-    g_saveCount = 0;
-    memset(g_saves, 0, sizeof(g_saves));
-    scan_dir("sdmc:/3ds/Checkpoint/saves", 0);
-    scan_dir("sdmc:/3ds/Checkpoint/extdata", 0);
-    scan_dir("sdmc:/Nintendo 3DS", 0);
-    scan_dir("sdmc:/3ds/TomodachiReal", 0);
-    scan_dir("sdmc:/Tomodachi", 0);
-    return g_saveCount;
+void fazerBackup() {
+    if (total == 0) return;
+    mkdir("sdmc:/TomodachiBackup", 0777);
+    FILE *src = fopen(caminhos[selecionado], "rb");
+    if (!src) { strcpy(msg, "Erro no backup!"); return; }
+    char dstPath[256];
+    snprintf(dstPath, sizeof(dstPath), "sdmc:/TomodachiBackup/bkp_%d.bin", selecionado + 1);
+    FILE *dst = fopen(dstPath, "wb");
+    if (!dst) { fclose(src); strcpy(msg, "Erro ao criar backup!"); return; }
+    char buf[1024];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), src)) > 0) fwrite(buf, 1, n, dst);
+    fclose(src);
+    fclose(dst);
+    strcpy(msg, "Backup feito!");
 }
 
-static int read_money_from(const char *path, long offset, u32 *out) {
-    FILE *f = fopen(path, "rb");
-    if (!f) return 0;
+int procurarETrocar() {
+    if (total == 0) return -2;
+    if (dinheiroAtual == 0) { strcpy(msg, "Atual nao pode ser 0!"); return -1; }
+    if (dinheiroAtual == dinheiroNovo) { strcpy(msg, "Atual = Novo!"); return -1; }
+
+    FILE *f = fopen(caminhos[selecionado], "rb");
+    if (!f) { strcpy(msg, "Erro ao abrir save!"); return -1; }
     fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
-    if (sz < offset + 4) { fclose(f); return 0; }
-    fseek(f, offset, SEEK_SET);
-    u8 b[4] = {0,0,0,0};
-    if (fread(b, 1, 4, f) != 4) { fclose(f); return 0; }
+    long tamanho = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    u8 *buf = malloc(tamanho);
+    if (!buf) { fclose(f); strcpy(msg, "Sem memoria!"); return -1; }
+    fread(buf, 1, tamanho, f);
     fclose(f);
-    u32 v = (u32)b[0] | ((u32)b[1] << 8) | ((u32)b[2] << 16) | ((u32)b[3] << 24);
-    *out = v;
-    return 1;
-}
 
-static int write_money_to(const char *path, long offset, u32 money) {
-    FILE *f = fopen(path, "r+b");
-    if (!f) return 0;
-    fseek(f, offset, SEEK_SET);
-    u8 b[4];
-    b[0] = money & 0xFF;
-    b[1] = (money >> 8) & 0xFF;
-    b[2] = (money >> 16) & 0xFF;
-    b[3] = (money >> 24) & 0xFF;
-    int ok = (fwrite(b, 1, 4, f) == 4);
-    fclose(f);
-    return ok;
-}
-
-static void make_backup(const char *src) {
-    char dst[MAX_PATH];
-    snprintf(dst, sizeof(dst), "%s.bak", src);
-    FILE *in = fopen(src, "rb");
-    if (!in) return;
-    FILE *out = fopen(dst, "wb");
-    if (out) {
-        u8 buf[4096];
-        size_t n;
-        while ((n = fread(buf, 1, sizeof(buf), in)) > 0) fwrite(buf, 1, n, out);
-        fclose(out);
-    }
-    fclose(in);
-    mkdir("sdmc:/3ds/TomodachiReal", 0777);
-    mkdir("sdmc:/3ds/TomodachiReal/backup", 0777);
-    FILE *in2 = fopen(src, "rb");
-    if (in2) {
-        FILE *out2 = fopen("sdmc:/3ds/TomodachiReal/backup/savedataArc_backup.txt", "wb");
-        if (out2) {
-            u8 buf[4096];
-            size_t n;
-            while ((n = fread(buf, 1, sizeof(buf), in2)) > 0) fwrite(buf, 1, n, out2);
-            fclose(out2);
+    int trocas = 0;
+    for (long i = 0; i <= tamanho - 4; i++) {
+        u32 v = 0;
+        memcpy(&v, buf + i, 4);
+        if (v == (u32)dinheiroAtual) {
+            u32 novo = (u32)dinheiroNovo;
+            memcpy(buf + i, &novo, 4);
+            trocas++;
         }
-        fclose(in2);
     }
+
+    if (trocas > 0) {
+        f = fopen(caminhos[selecionado], "wb");
+        fwrite(buf, 1, tamanho, f);
+        fclose(f);
+        snprintf(msg, sizeof(msg), "Achou %d lugar(es), trocou!", trocas);
+    } else {
+        strcpy(msg, "Achou 0 lugares!");
+    }
+    free(buf);
+    return trocas;
 }
 
-static void restore_backup(void) {
-    for (int i = 0; i < g_saveCount; i++) {
-        char bak[MAX_PATH];
-        snprintf(bak, sizeof(bak), "%s.bak", g_saves[i]);
-        FILE *in = fopen(bak, "rb");
-        if (!in) continue;
-        FILE *out = fopen(g_saves[i], "wb");
-        if (out) {
-            u8 buf[4096];
-            size_t n;
-            while ((n = fread(buf, 1, sizeof(buf), in)) > 0) fwrite(buf, 1, n, out);
-            fclose(out);
-        }
-        fclose(in);
+void desenhar() {
+    consoleClear();
+    printf("=== Tomodachi Life Save Editor ===\n");
+    printf("by Darkness Metal - V2.2\n");
+    printf("--------------------------------\n");
+    if (total == 0) {
+        printf("Nenhum save achado.\n");
+        printf("Faca backup no Checkpoint\n");
+        printf("antes de abrir aqui.\n");
+        printf("\nSTART: sair\n");
+        return;
     }
-    if (g_saveCount > 0) read_money_from(g_saves[0], g_offset, &g_money);
+    printf("Save: %s\n", nomes[selecionado]);
+    printf("--------------------------------\n");
+    printf("%s Atual: %d\n", editandoAtual ? ">" : " ", dinheiroAtual);
+    printf("%s Novo: %d\n", !editandoAtual ? ">" : " ", dinheiroNovo);
+    printf("--------------------------------\n");
+    printf("SELECT: trocar Atual / Novo\n");
+    printf("Esq/Dir: -1000 / +1000\n");
+    printf("Cima/Baixo: trocar save\n");
+    printf("Y: Novo = 999999\n");
+    printf("A: aplicar  X: backup\n");
+    printf("START: sair\n");
+    printf("\n%s\n", msg);
 }
 
-int main(int argc, char **argv) {
-    (void)argc; (void)argv;
+int main() {
     gfxInitDefault();
     consoleInit(GFX_TOP, NULL);
-    printf("=== Tomodachi Life Save Editor ===\n");
-    printf("for 3DS by Darkness Metal - V2\n");
-    printf("\nProcurando saves...\n");
-    find_all_saves();
-    if (g_saveCount > 0) {
-        g_found = 1;
-        for (int i = 0; i < g_saveCount; i++) make_backup(g_saves[i]);
-        if (!read_money_from(g_saves[0], g_offset, &g_money)) g_money = 0;
-        if (g_money > 99999999) {
-            u32 alt = 0;
-            if (read_money_from(g_saves[0], 0x1E4C00, &alt) && alt <= 99999999) {
-                g_offset = 0x1E4C00;
-                g_money = alt;
-            }
-        }
-        snprintf(g_msg, sizeof(g_msg), "Backup auto feito! %d save(s)", g_saveCount);
-    } else {
-        g_found = 0;
-        snprintf(g_msg, sizeof(g_msg), "Nenhum save achado.");
-    }
+    buscarSaves();
+    desenhar();
+    precisaRedesenhar = 0;
+
     while (aptMainLoop()) {
         hidScanInput();
         u32 kDown = hidKeysDown();
-        if (kDown & KEY_START) {
-            if (g_found) {
-                int ok = 0;
-                for (int i = 0; i < g_saveCount; i++) {
-                    if (write_money_to(g_saves[i], g_offset, g_money)) ok++;
-                }
-                consoleClear();
-                printf("=== Tomodachi Life Save Editor ===\n");
-                printf("for 3DS by Darkness Metal - V2\n\n");
-                printf("Salvo em %d/%d!\n", ok, g_saveCount);
-                printf("Se editou so o backup,\n");
-                printf("abre o Checkpoint e faz Restore!\n\n");
-                printf("Saindo...\n");
-                gfxFlushBuffers();
-                gfxSwapBuffers();
-                gspWaitForVBlank();
-                svcSleepThread(1500000000);
+        if (kDown & KEY_START) break;
+
+        if (total > 0) {
+            if (kDown & KEY_UP) {
+                selecionado--;
+                if (selecionado < 0) selecionado = total - 1;
+                strcpy(msg, "");
+                precisaRedesenhar = 1;
             }
-            break;
-        }
-        if (kDown & KEY_SELECT) {
-            find_all_saves();
-            if (g_saveCount > 0) {
-                g_found = 1;
-                if (!read_money_from(g_saves[0], g_offset, &g_money)) g_money = 0;
-                snprintf(g_msg, sizeof(g_msg), "Re-escaneado: %d save(s)", g_saveCount);
-            } else {
-                g_found = 0;
-                snprintf(g_msg, sizeof(g_msg), "Nenhum save achado.");
+            if (kDown & KEY_DOWN) {
+                selecionado++;
+                if (selecionado >= total) selecionado = 0;
+                strcpy(msg, "");
+                precisaRedesenhar = 1;
             }
-        }
-        if (g_found) {
-            if (kDown & KEY_A) { g_money = MONEY_MAX; snprintf(g_msg, sizeof(g_msg), "MAX 999999! Aperte START p/ salvar"); }
-            if (kDown & KEY_B) { g_money = 0; snprintf(g_msg, sizeof(g_msg), "Zerado! Aperte START p/ salvar"); }
-            if (kDown & KEY_UP) { if (g_money + 1000 <= 99999999) g_money += 1000; }
-            if (kDown & KEY_DOWN) { if (g_money >= 1000) g_money -= 1000; else g_money = 0; }
-            if (kDown & KEY_RIGHT) { if (g_money + 10000 <= 99999999) g_money += 10000; }
-            if (kDown & KEY_LEFT) { if (g_money >= 10000) g_money -= 10000; else g_money = 0; }
+            if (kDown & KEY_SELECT) {
+                editandoAtual = !editandoAtual;
+                precisaRedesenhar = 1;
+            }
+            if (kDown & KEY_LEFT) {
+                if (editandoAtual) { dinheiroAtual -= 1000; if (dinheiroAtual < 0) dinheiroAtual = 0; }
+                else { dinheiroNovo -= 1000; if (dinheiroNovo < 0) dinheiroNovo = 0; }
+                precisaRedesenhar = 1;
+            }
+            if (kDown & KEY_RIGHT) {
+                if (editandoAtual) dinheiroAtual += 1000;
+                else dinheiroNovo += 1000;
+                precisaRedesenhar = 1;
+            }
+            if (kDown & KEY_Y) {
+                dinheiroNovo = 999999;
+                precisaRedesenhar = 1;
+            }
+            if (kDown & KEY_A) {
+                procurarETrocar();
+                precisaRedesenhar = 1;
+            }
             if (kDown & KEY_X) {
-                for (int i = 0; i < g_saveCount; i++) make_backup(g_saves[i]);
-                snprintf(g_msg, sizeof(g_msg), "Backup feito de novo!");
-            }
-            if (kDown & KEY_Y) { restore_backup(); snprintf(g_msg, sizeof(g_msg), "Backup restaurado!"); }
-            if (kDown & KEY_L) {
-                g_offset = (g_offset == MONEY_OFFSET) ? 0x1E4C00 : MONEY_OFFSET;
-                u32 v = 0;
-                if (read_money_from(g_saves[0], g_offset, &v)) g_money = v;
-                snprintf(g_msg, sizeof(g_msg), "Offset: 0x%lX", (unsigned long)g_offset);
+                fazerBackup();
+                precisaRedesenhar = 1;
             }
         }
-        consoleClear();
-        printf("=== Tomodachi Life Save Editor ===\n");
-        printf("for 3DS by Darkness Metal - V2\n");
-        printf("--------------------------------\n");
-        if (!g_found) {
-            printf("Save nao achado!\n\n");
-            printf("Eu procurei em:\n");
-            printf(" - /3ds/Checkpoint/saves/\n");
-            printf(" - /3ds/Checkpoint/extdata/\n");
-            printf(" - /Nintendo 3DS/.../0008C300 US\n");
-            printf(" - /Nintendo 3DS/.../0008C400 EU\n");
-            printf(" - /3ds/TomodachiReal/\n\n");
-            printf("Faca assim no Checkpoint:\n");
-            printf("1. Abre Checkpoint\n");
-            printf("2. Acha Tomodachi Life\n");
-            printf("3. Aperta Backup\n");
-            printf("4. Se for extdata, aperta X\n");
-            printf("5. Volta aqui e aperta SELECT\n\n");
-            printf("SELECT = procurar de novo\n");
-            printf("START = sair\n");
-        } else {
-            printf("Saves achados: %d\n", g_saveCount);
-            for (int i = 0; i < g_saveCount && i < 3; i++) {
-                printf("%d: %s\n", i+1, g_saves[i]);
-            }
-            if (g_saveCount > 3) printf("... + %d mais\n", g_saveCount - 3);
-            printf("\nOffset: 0x%lX\n", (unsigned long)g_offset);
-            printf("Dinheiro: %lu\n", (unsigned long)g_money);
-            printf("\nCIMA +1000  BAIXO -1000\n");
-            printf("DIREITA +10000  ESQUERDA -10000\n");
-            printf("A = MAX 999999  B = 0\n");
-            printf("X = backup  Y = restaurar\n");
-            printf("L = trocar offset\n");
-            printf("SELECT = procurar de novo\n");
-            printf("START = SALVAR EM TODOS + sair\n\n");
-            printf("Se editou so o backup do\n");
-            printf("Checkpoint, abre o Checkpoint\n");
-            printf("e faz Restore p/ o jogo ver!\n");
+
+        if (precisaRedesenhar) {
+            desenhar();
+            precisaRedesenhar = 0;
         }
-        printf("\n%s\n", g_msg);
         gfxFlushBuffers();
-        gfxSwapBuffers();
         gspWaitForVBlank();
     }
     gfxExit();
