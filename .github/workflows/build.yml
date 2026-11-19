@@ -8,17 +8,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: devkitpro/devkitarm:latest
+      image: ahoischen/3ds-dev-docker:latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install 3DS tools
+      - name: Check tools
         run: |
-          echo "/opt/devkitpro/tools/bin" >> $GITHUB_PATH
-          export PATH="/opt/devkitpro/tools/bin:$PATH"
-          ls /opt/devkitpro/tools/bin/
           which bannertool
           which makerom
+          ls /opt/devkitpro/tools/bin/ | grep -E "bannertool|makerom|smdh"
 
       - name: Build 3DSX
         run: |
@@ -27,7 +25,6 @@ jobs:
 
       - name: Make banner
         run: |
-          export PATH="/opt/devkitpro/tools/bin:$PATH"
           ls -lh banner.png icon.png
           python3 -c "import wave; w=wave.open('silent.wav','wb'); w.setnchannels(2); w.setsampwidth(2); w.setframerate(44100); w.writeframes(b'\x00\x00\x00\x00'*44100); w.close()"
           bannertool makebanner -i banner.png -a silent.wav -o banner.bnr
@@ -35,7 +32,6 @@ jobs:
 
       - name: Make CIA
         run: |
-          export PATH="/opt/devkitpro/tools/bin:$PATH"
           cat > game.rsf <<'EOF'
           BasicInfo:
             Title : "Tomodachi Life Save Editor"
