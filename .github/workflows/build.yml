@@ -12,13 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install 3DS tools
+        run: |
+          apt-get update
+          apt-get install -y 3dstools
+          which bannertool
+          which makerom
+
       - name: Build 3DSX
-        run: make
+        run: |
+          make
+          ls -lh TomodachiLifeSaveEditor.elf TomodachiLifeSaveEditor.3dsx TomodachiLifeSaveEditor.smdh
 
       - name: Make banner
         run: |
+          ls -lh banner.png icon.png
           python3 -c "import wave; w=wave.open('silent.wav','wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050); w.writeframes(b'\x00\x00'*22050); w.close()"
           bannertool makebanner -i banner.png -a silent.wav -o banner.bnr
+          ls -lh banner.bnr
 
       - name: Make CIA
         run: |
