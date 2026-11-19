@@ -36,7 +36,7 @@ jobs:
                   im.save(dst)
                   print(f"feito {dst} {im.size}")
           except Exception as e:
-              print(f"sem PIL, pulando shiny e usando original: {e}")
+              print(f"sem PIL, pulando shiny: {e}")
           PY
           if [ ! -f icon_shiny.png ]; then cp icon.png icon_shiny.png || true; fi
           if [ ! -f banner_shiny.png ]; then cp banner.png banner_shiny.png || true; fi
@@ -45,24 +45,46 @@ jobs:
           smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max no Tomodachi Life" "Darkness Metal" $ICON_FILE TomodachiLifeSaveEditor.smdh || smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max no Tomodachi Life" "Darkness Metal" icon.png TomodachiLifeSaveEditor.smdh || true
           ls -lh TomodachiLifeSaveEditor.elf TomodachiLifeSaveEditor.3dsx TomodachiLifeSaveEditor.smdh || true
 
-      - name: Get tools sem git clone
+      - name: Get tools 4 tentativas
         run: |
           mkdir -p /tmp/tools /tmp/bt || true
-          echo "== makerom via API =="
-          MAKEROM_URL=$(curl -s https://api.github.com/repos/3DSGuy/Project_CTR/releases/latest | grep browser_download_url | grep ubuntu | head -n 1 | cut -d '"' -f 4) || true
-          echo "URL $MAKEROM_URL"
-          curl -L --fail -o /tmp/tools/makerom "$MAKEROM_URL" || curl -L --fail -o /tmp/tools/makerom https://github.com/3DSGuy/Project_CTR/releases/download/v0.19.0/makerom-ubuntu_x86_64 || echo "makerom falhou, CIA vai ser pulado"
+          echo "== makerom tentativa 1 BootNTR raw =="
+          curl -L --fail -o /tmp/tools/makerom https://raw.githubusercontent.com/44670/BootNTR/master/lib/ctrcommon/tools/makerom-linux && ls -lh /tmp/tools/makerom || echo "tentativa 1 falhou"
+          if [ ! -s /tmp/tools/makerom ] || [ $(wc -c < /tmp/tools/makerom) -lt 10000 ]; then
+            echo "== makerom tentativa 2 open-supaplex raw =="
+            curl -L --fail -o /tmp/tools/makerom https://raw.githubusercontent.com/sergiou87/open-supaplex/master/3ds/tools/makerom-linux && ls -lh /tmp/tools/makerom || echo "tentativa 2 falhou"
+          fi
+          if [ ! -s /tmp/tools/makerom ] || [ $(wc -c < /tmp/tools/makerom) -lt 10000 ]; then
+            echo "== makerom tentativa 3 API =="
+            MAKEROM_URL=$(curl -s https://api.github.com/repos/3DSGuy/Project_CTR/releases/latest | grep browser_download_url | grep ubuntu | head -n 1 | cut -d '"' -f 4) || true
+            echo "URL $MAKEROM_URL"
+            curl -L --fail -o /tmp/tools/makerom "$MAKEROM_URL" || echo "tentativa 3 falhou"
+          fi
+          if [ ! -s /tmp/tools/makerom ] || [ $(wc -c < /tmp/tools/makerom) -lt 10000 ]; then
+            echo "== makerom tentativa 4 release fixo =="
+            curl -L --fail -o /tmp/tools/makerom https://github.com/3DSGuy/Project_CTR/releases/download/v0.19.0/makerom-ubuntu_x86_64 || echo "tentativa 4 falhou"
+          fi
           chmod +x /tmp/tools/makerom || true
           ls -lh /tmp/tools/makerom || true
-          echo "== bannertool via API =="
-          BANNER_URL=$(curl -s https://api.github.com/repos/Epicpkmn11/bannertool/releases/latest | grep browser_download_url | grep -i zip | head -n 1 | cut -d '"' -f 4) || true
-          echo "URL $BANNER_URL"
-          curl -L --fail -o /tmp/bannertool.zip "$BANNER_URL" || curl -L --fail -o /tmp/bannertool.zip https://github.com/Epicpkmn11/bannertool/releases/download/v1.2.0/bannertool.zip || echo "bannertool zip falhou"
-          unzip -o /tmp/bannertool.zip -d /tmp/bt || true
-          find /tmp/bt -type f | head -n 20 || true
-          find /tmp/bt -type f -iname "*bannertool*" -exec cp {} /tmp/tools/bannertool \; || true
+          file /tmp/tools/makerom || true
+          echo "== bannertool tentativa 1 BootNTR raw =="
+          curl -L --fail -o /tmp/tools/bannertool https://raw.githubusercontent.com/44670/BootNTR/master/lib/ctrcommon/tools/bannertool-linux && ls -lh /tmp/tools/bannertool || echo "tentativa 1 falhou"
+          if [ ! -s /tmp/tools/bannertool ] || [ $(wc -c < /tmp/tools/bannertool) -lt 10000 ]; then
+            echo "== bannertool tentativa 2 open-supaplex raw =="
+            curl -L --fail -o /tmp/tools/bannertool https://raw.githubusercontent.com/sergiou87/open-supaplex/master/3ds/tools/bannertool-linux && ls -lh /tmp/tools/bannertool || echo "tentativa 2 falhou"
+          fi
+          if [ ! -s /tmp/tools/bannertool ] || [ $(wc -c < /tmp/tools/bannertool) -lt 10000 ]; then
+            echo "== bannertool tentativa 3 API zip =="
+            BANNER_URL=$(curl -s https://api.github.com/repos/Epicpkmn11/bannertool/releases/latest | grep browser_download_url | grep -i zip | head -n 1 | cut -d '"' -f 4) || true
+            echo "URL $BANNER_URL"
+            curl -L --fail -o /tmp/bannertool.zip "$BANNER_URL" || curl -L --fail -o /tmp/bannertool.zip https://github.com/Epicpkmn11/bannertool/releases/download/v1.2.0/bannertool.zip || echo "tentativa 3 falhou"
+            unzip -o /tmp/bannertool.zip -d /tmp/bt || true
+            find /tmp/bt -type f -iname "*bannertool*" -exec cp {} /tmp/tools/bannertool \; || true
+          fi
           chmod +x /tmp/tools/bannertool || true
           ls -lh /tmp/tools/ || true
+          file /tmp/tools/bannertool || true
+          file /tmp/tools/makerom || true
 
       - name: Make som Umbreon Black 2
         run: |
@@ -99,37 +121,29 @@ jobs:
           if [ -f banner_shiny.png ]; then BANNER_IMG="banner_shiny.png"; fi
           ls -lh $BANNER_IMG banner_sound.wav || true
           if [ -x /tmp/tools/bannertool ]; then
-            bannertool makebanner -i $BANNER_IMG -a banner_sound.wav -o banner.bnr || echo "bannertool falhou, pulando"
+            bannertool makebanner -i $BANNER_IMG -a banner_sound.wav -o banner.bnr || echo "bannertool falhou"
             ls -lh banner.bnr || true
           else
-            echo "sem bannertool, pulando banner.bnr sem falhar"
+            echo "ERRO: sem bannertool, nao da pra fazer banner.bnr"
+            exit 1
           fi
 
-      - name: Make CIA se der
+      - name: Make CIA
         run: |
           export PATH="/tmp/tools:$PATH"
-          if [ -x /tmp/tools/makerom ] && [ -f banner.bnr ] && [ -f TomodachiLifeSaveEditor.smdh ]; then
-            printf 'BasicInfo:\n  Title : "Tomodachi Life Save Editor"\n  CompanyCode : "00"\n  ProductCode : "CTR-P-TLSE"\n  ContentType : "Application"\nTitleInfo:\n  UniqueId : 0x01F001\n  Category : 0\nOption:\n  UseOnSD : true\n  EnableCrypt : false\n  EnableCompress : true\n  FreeProductCode : true\n  MediaFootSize : 0x00000000\n' > game.rsf
-            cat game.rsf || true
-            makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.smdh -banner banner.bnr || echo "makerom falhou"
-            ls -lh TomodachiLifeSaveEditor.cia || true
-          else
-            echo "pulando CIA, falta makerom ou banner, build continua verde"
-          fi
+          if [ ! -x /tmp/tools/makerom ]; then echo "ERRO: sem makerom"; exit 1; fi
+          if [ ! -f banner.bnr ]; then echo "ERRO: sem banner.bnr"; exit 1; fi
+          printf 'BasicInfo:\n  Title : "Tomodachi Life Save Editor"\n  CompanyCode : "00"\n  ProductCode : "CTR-P-TLSE"\n  ContentType : "Application"\nTitleInfo:\n  UniqueId : 0x01F001\n  Category : 0\nOption:\n  UseOnSD : true\n  EnableCrypt : false\n  EnableCompress : true\n  FreeProductCode : true\n  MediaFootSize : 0x00000000\n' > game.rsf
+          cat game.rsf || true
+          makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.smdh -banner banner.bnr
+          ls -lh TomodachiLifeSaveEditor.cia
 
-      - name: Upload 3DSX
+      - name: Upload tudo
         uses: actions/upload-artifact@v4
         with:
           name: TomodachiLifeSaveEditor
           path: |
             TomodachiLifeSaveEditor.3dsx
             TomodachiLifeSaveEditor.smdh
+            TomodachiLifeSaveEditor.cia
           if-no-files-found: error
-
-      - name: Upload CIA se existir
-        if: hashFiles('TomodachiLifeSaveEditor.cia') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: TomodachiLifeSaveEditor-CIA
-          path: TomodachiLifeSaveEditor.cia
-          if-no-files-found: warn
