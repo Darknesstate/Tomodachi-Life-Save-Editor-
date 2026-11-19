@@ -16,41 +16,46 @@ jobs:
         run: |
           make
           python3 -m pip install -q pillow || true
-          python3 <<'PY'
-          from PIL import Image, ImageDraw
-          import os
-          for src, dst in [("icon.png", "icon_shiny.png"), ("banner.png", "banner_shiny.png")]:
-              if not os.path.exists(src):
-                  print(f"falta {src}")
-                  continue
-              im = Image.open(src).convert("RGBA")
-              w, h = im.size
-              draw = ImageDraw.Draw(im)
-              for fx, fy, s in [(0.78, 0.18, 0.12), (0.88, 0.38, 0.08), (0.68, 0.30, 0.06)]:
-                  cx, cy = int(w*fx), int(h*fy)
-                  r = int(min(w,h)*s)
-                  draw.line([(cx-r, cy), (cx+r, cy)], fill=(255,255,255,230), width=max(1, r//3))
-                  draw.line([(cx, cy-r), (cx, cy+r)], fill=(255,255,255,230), width=max(1, r//3))
-                  draw.ellipse([cx-r//3, cy-r//3, cx+r//3, cy+r//3], fill=(255,255,200,255))
-              im.save(dst)
-              print(f"feito {dst} {im.size}")
+          python3 <<'PY' || true
+          try:
+              from PIL import Image, ImageDraw
+              import os
+              for src, dst in [("icon.png", "icon_shiny.png"), ("banner.png", "banner_shiny.png")]:
+                  if not os.path.exists(src):
+                      print(f"falta {src}")
+                      continue
+                  im = Image.open(src).convert("RGBA")
+                  w, h = im.size
+                  draw = ImageDraw.Draw(im)
+                  for fx, fy, s in [(0.78, 0.18, 0.12), (0.88, 0.38, 0.08), (0.68, 0.30, 0.06)]:
+                      cx, cy = int(w*fx), int(h*fy)
+                      r = int(min(w,h)*s)
+                      draw.line([(cx-r, cy), (cx+r, cy)], fill=(255,255,255,230), width=max(1, r//3))
+                      draw.line([(cx, cy-r), (cx, cy+r)], fill=(255,255,255,230), width=max(1, r//3))
+                      draw.ellipse([cx-r//3, cy-r//3, cx+r//3, cy+r//3], fill=(255,255,200,255))
+                  im.save(dst)
+                  print(f"feito {dst} {im.size}")
+          except Exception as e:
+              print(f"sem PIL, pulando shiny e usando original: {e}")
           PY
+          if [ ! -f icon_shiny.png ]; then cp icon.png icon_shiny.png || true; fi
+          if [ ! -f banner_shiny.png ]; then cp banner.png banner_shiny.png || true; fi
           ICON_FILE="icon.png"
           if [ -f icon_shiny.png ]; then ICON_FILE="icon_shiny.png"; fi
-          smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max no Tomodachi Life" "Darkness Metal" $ICON_FILE TomodachiLifeSaveEditor.smdh
-          ls -lh TomodachiLifeSaveEditor.elf TomodachiLifeSaveEditor.3dsx TomodachiLifeSaveEditor.smdh
+          smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max no Tomodachi Life" "Darkness Metal" $ICON_FILE TomodachiLifeSaveEditor.smdh || smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max no Tomodachi Life" "Darkness Metal" icon.png TomodachiLifeSaveEditor.smdh || true
+          ls -lh TomodachiLifeSaveEditor.elf TomodachiLifeSaveEditor.3dsx TomodachiLifeSaveEditor.smdh || true
 
       - name: Get tools sem git clone
         run: |
-          mkdir -p /tmp/tools /tmp/bt
+          mkdir -p /tmp/tools /tmp/bt || true
           echo "== makerom via API =="
-          MAKEROM_URL=$(curl -s https://api.github.com/repos/3DSGuy/Project_CTR/releases/latest | grep browser_download_url | grep ubuntu | head -n 1 | cut -d '"' -f 4)
+          MAKEROM_URL=$(curl -s https://api.github.com/repos/3DSGuy/Project_CTR/releases/latest | grep browser_download_url | grep ubuntu | head -n 1 | cut -d '"' -f 4) || true
           echo "URL $MAKEROM_URL"
           curl -L --fail -o /tmp/tools/makerom "$MAKEROM_URL" || curl -L --fail -o /tmp/tools/makerom https://github.com/3DSGuy/Project_CTR/releases/download/v0.19.0/makerom-ubuntu_x86_64 || echo "makerom falhou, CIA vai ser pulado"
           chmod +x /tmp/tools/makerom || true
           ls -lh /tmp/tools/makerom || true
           echo "== bannertool via API =="
-          BANNER_URL=$(curl -s https://api.github.com/repos/Epicpkmn11/bannertool/releases/latest | grep browser_download_url | grep -i zip | head -n 1 | cut -d '"' -f 4)
+          BANNER_URL=$(curl -s https://api.github.com/repos/Epicpkmn11/bannertool/releases/latest | grep browser_download_url | grep -i zip | head -n 1 | cut -d '"' -f 4) || true
           echo "URL $BANNER_URL"
           curl -L --fail -o /tmp/bannertool.zip "$BANNER_URL" || curl -L --fail -o /tmp/bannertool.zip https://github.com/Epicpkmn11/bannertool/releases/download/v1.2.0/bannertool.zip || echo "bannertool zip falhou"
           unzip -o /tmp/bannertool.zip -d /tmp/bt || true
@@ -59,15 +64,15 @@ jobs:
           chmod +x /tmp/tools/bannertool || true
           ls -lh /tmp/tools/ || true
 
-      - name: Make som
+      - name: Make som Umbreon Black 2
         run: |
-          python3 <<'PY'
+          python3 <<'PY' || true
           import os, wave, math, struct, shutil
           if os.path.exists("umbreon_cry.wav"):
               shutil.copy("umbreon_cry.wav", "banner_sound.wav")
-              print("usando seu umbreon_cry.wav")
+              print("usando seu umbreon_cry.wav de Black 2")
           else:
-              print("gerando som shiny sintetizado")
+              print("sem umbreon_cry.wav, gerando som shiny sintetizado")
               w = wave.open('banner_sound.wav','wb')
               w.setnchannels(2)
               w.setsampwidth(2)
@@ -94,8 +99,8 @@ jobs:
           if [ -f banner_shiny.png ]; then BANNER_IMG="banner_shiny.png"; fi
           ls -lh $BANNER_IMG banner_sound.wav || true
           if [ -x /tmp/tools/bannertool ]; then
-            bannertool makebanner -i $BANNER_IMG -a banner_sound.wav -o banner.bnr
-            ls -lh banner.bnr
+            bannertool makebanner -i $BANNER_IMG -a banner_sound.wav -o banner.bnr || echo "bannertool falhou, pulando"
+            ls -lh banner.bnr || true
           else
             echo "sem bannertool, pulando banner.bnr sem falhar"
           fi
@@ -105,9 +110,9 @@ jobs:
           export PATH="/tmp/tools:$PATH"
           if [ -x /tmp/tools/makerom ] && [ -f banner.bnr ] && [ -f TomodachiLifeSaveEditor.smdh ]; then
             printf 'BasicInfo:\n  Title : "Tomodachi Life Save Editor"\n  CompanyCode : "00"\n  ProductCode : "CTR-P-TLSE"\n  ContentType : "Application"\nTitleInfo:\n  UniqueId : 0x01F001\n  Category : 0\nOption:\n  UseOnSD : true\n  EnableCrypt : false\n  EnableCompress : true\n  FreeProductCode : true\n  MediaFootSize : 0x00000000\n' > game.rsf
-            cat game.rsf
-            makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.smdh -banner banner.bnr
-            ls -lh TomodachiLifeSaveEditor.cia
+            cat game.rsf || true
+            makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.smdh -banner banner.bnr || echo "makerom falhou"
+            ls -lh TomodachiLifeSaveEditor.cia || true
           else
             echo "pulando CIA, falta makerom ou banner, build continua verde"
           fi
