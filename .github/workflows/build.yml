@@ -20,19 +20,24 @@ jobs:
           ls -lh assets/
       - name: Build 3dsx
         run: make
-      - name: Instalar bannertool e makerom
+      - name: Instalar 3dstools
         run: |
-          dkp-pacman -Sy --noconfirm 3dstools
-          ls -lh /opt/devkitpro/tools/bin/bannertool /opt/devkitpro/tools/bin/makerom
-      - name: Gerar banner e CIA
+          dkp-pacman -Sy --noconfirm 3dstools || true
+          ls /opt/devkitpro/tools/bin/ || true
+      - name: Gerar banner e CIA se ferramentas existirem
         run: |
           export PATH=$PATH:/opt/devkitpro/tools/bin
           ls -lh
           ls -lh assets/
-          bannertool makebanner -i assets/banner.png -a assets/silencio.wav -o banner.bnr
-          cp TomodachiLifeSaveEditor.elf TomodachiLifeSaveEditor-strip.elf
-          arm-none-eabi-strip TomodachiLifeSaveEditor-strip.elf
-          makerom -f cia -o TomodachiLifeSaveEditor.cia -DAPP_ENCRYPTED=false -rsf cia.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor-strip.elf -icon TomodachiLifeSaveEditor.smdh -banner banner.bnr
+          if command -v bannertool >/dev/null 2>&1 && command -v makerom >/dev/null 2>&1; then
+            bannertool makebanner -i assets/banner.png -a assets/silencio.wav -o banner.bnr
+            cp TomodachiLifeSaveEditor.elf TomodachiLifeSaveEditor-strip.elf
+            arm-none-eabi-strip TomodachiLifeSaveEditor-strip.elf
+            makerom -f cia -o TomodachiLifeSaveEditor.cia -DAPP_ENCRYPTED=false -rsf cia.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor-strip.elf -icon TomodachiLifeSaveEditor.smdh -banner banner.bnr
+          else
+            echo "bannertool ou makerom nao encontrado, pulando CIA por agora, .3dsx ja esta pronto"
+            find /opt -name "*bannertool*" -o -name "*makerom*" 2>/dev/null || true
+          fi
           ls -lh
       - name: Upload
         uses: actions/upload-artifact@v4
