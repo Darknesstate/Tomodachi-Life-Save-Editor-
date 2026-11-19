@@ -8,6 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container: devkitpro/devkitarm:latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,9 +21,9 @@ jobs:
           set -e
           mkdir -p tools
           echo "Baixando bannertool..."
-          wget -O tools/bannertool https://raw.githubusercontent.[STRIPPED 89 bytes] || wget -O tools/bannertool https://raw.githubusercontent.com/libretro/RetroArch/master/ctr/tools/bannertool-linux || true
+          wget --timeout=20 --tries=2 -O tools/bannertool https://raw.githubusercontent.[STRIPPED 89 bytes] || wget --timeout=20 --tries=2 -O tools/bannertool https://raw.githubusercontent.com/libretro/RetroArch/master/ctr/tools/bannertool-linux || true
           echo "Baixando makerom..."
-          wget -O tools/makerom https://raw.githubusercontent.[STRIPPED 86 bytes] || wget -O tools/makerom https://raw.githubusercontent.com/libretro/RetroArch/master/ctr/tools/makerom-linux || true
+          wget --timeout=20 --tries=2 -O tools/makerom https://raw.githubusercontent.[STRIPPED 86 bytes] || wget --timeout=20 --tries=2 -O tools/makerom https://raw.githubusercontent.com/libretro/RetroArch/master/ctr/tools/makerom-linux || true
           chmod +x tools/bannertool tools/makerom || true
           ls -lh tools/
           if [ ! -s tools/bannertool ]; then echo "ERRO bannertool vazio"; exit 1; fi
