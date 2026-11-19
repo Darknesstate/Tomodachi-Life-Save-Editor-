@@ -8,53 +8,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ahoischen/3ds-dev-docker:latest
+      image: devkitpro/devkitarm:latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check tools
-        run: |
-          which bannertool
-          which makerom
-          ls /opt/devkitpro/tools/bin/ | grep -E "bannertool|makerom|smdh"
 
       - name: Build 3DSX
         run: |
           make
+          smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max no Tomodachi Life" "Darkness Metal" icon.png TomodachiLifeSaveEditor.smdh
           ls -lh TomodachiLifeSaveEditor.elf TomodachiLifeSaveEditor.3dsx TomodachiLifeSaveEditor.smdh
-
-      - name: Make banner
-        run: |
-          ls -lh banner.png icon.png
-          python3 -c "import wave; w=wave.open('silent.wav','wb'); w.setnchannels(2); w.setsampwidth(2); w.setframerate(44100); w.writeframes(b'\x00\x00\x00\x00'*44100); w.close()"
-          bannertool makebanner -i banner.png -a silent.wav -o banner.bnr
-          ls -lh banner.bnr
-
-      - name: Make CIA
-        run: |
-          cat > game.rsf <<'EOF'
-          BasicInfo:
-            Title : "Tomodachi Life Save Editor"
-            CompanyCode : "00"
-            ProductCode : "CTR-P-TLSE"
-            ContentType : "Application"
-          TitleInfo:
-            UniqueId : 0x01F001
-            Category : 0
-          Option:
-            UseOnSD : true
-            EnableCrypt : false
-            EnableCompress : true
-            FreeProductCode : true
-            MediaFootSize : 0x00000000
-          EOF
-          makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.smdh -banner banner.bnr
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: TomodachiLifeSaveEditor
+          name: TomodachiLifeSaveEditor-3DSX
           path: |
             TomodachiLifeSaveEditor.3dsx
             TomodachiLifeSaveEditor.smdh
-            TomodachiLifeSaveEditor.cia
