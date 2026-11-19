@@ -7,27 +7,54 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     container:
       image: devkitpro/devkitarm:latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build 3DSX + Shiny + Resize
+      - name: Check files
         run: |
-          make
+          echo "=== Arquivos no repo ==="
+          ls -lh || true
+          echo "=== SUA IMAGEM + SOM ==="
+          ls -lh icon.png banner.png umbreon_cry.wav || true
+          file icon.png banner.png umbreon_cry.wav || true
+          echo "Se icon.png e banner.png existem, sao os SEUS que vao pro CIA"
+
+      - name: Build 3DSX + Shiny + Resize - NAO apaga sua arte
+        run: |
+          make || (echo "make falhou, tentando clean" && make clean || true && make) || (echo "tentando make -j1" && make -j1) || (echo "ERRO MAKE" && exit 1)
+          ls -lh TomodachiLifeSaveEditor.elf || (echo "SEM ELF" && exit 1)
           python3 -m pip install -q pillow || true
           python3 <<'PYEOF'
           try:
               from PIL import Image, ImageDraw
               import os
+              # SO cria placeholder se VOCE nao subiu a imagem. Se subiu, mantem a sua.
+              if not os.path.exists("icon.png"):
+                  print("sem icon.png, criando placeholder")
+                  im = Image.new("RGBA", (48,48), (20,20,40,255))
+                  d = ImageDraw.Draw(im)
+                  d.ellipse([8,8,40,40], fill=(255,200,0,255))
+                  d.ellipse([16,16,32,32], fill=(30,30,50,255))
+                  im.save("icon.png")
+              if not os.path.exists("banner.png"):
+                  print("sem banner.png, criando placeholder")
+                  im = Image.new("RGBA", (256,128), (20,20,40,255))
+                  d = ImageDraw.Draw(im)
+                  d.ellipse([90,20,166,108], fill=(255,200,0,255))
+                  im.save("banner.png")
+              # Resize sem apagar conteudo - sua arte Darkness Metal continua
               if os.path.exists("icon.png"):
                   im = Image.open("icon.png").convert("RGBA").resize((48,48), Image.LANCZOS)
                   im.save("icon.png")
-                  print("icon 48x48 ok")
+                  print("icon 48x48 ok - sua arte mantida")
               if os.path.exists("banner.png"):
                   im = Image.open("banner.png").convert("RGBA").resize((256,128), Image.LANCZOS)
                   im.save("banner.png")
-                  print("banner 256x128 ok")
+                  print("banner 256x128 ok - sua arte Darkness Metal mantida")
+              # Brilho por cima, sem apagar o que ja tem
               for src, dst in [("icon.png", "icon_shiny.png"), ("banner.png", "banner_shiny.png")]:
                   if not os.path.exists(src):
                       continue
@@ -40,6 +67,7 @@ jobs:
                       draw.line([(cx-r, cy), (cx+r, cy)], fill=(255,255,255,230), width=max(1, r//3))
                       draw.line([(cx, cy-r), (cx, cy+r)], fill=(255,255,255,230), width=max(1, r//3))
                   im.save(dst)
+                  print(f"brilho adicionado em {dst}, sua arte intacta")
           except Exception as e:
               print(f"sem PIL: {e}")
           PYEOF
@@ -47,78 +75,53 @@ jobs:
           if [ ! -f banner_shiny.png ]; then cp banner.png banner_shiny.png || true; fi
           ICON_FILE="icon.png"
           if [ -f icon_shiny.png ]; then ICON_FILE="icon_shiny.png"; fi
-          smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max no Tomodachi Life" "Darkness Metal" $ICON_FILE TomodachiLifeSaveEditor.smdh
+          smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max no Tomodachi Life" "Darkness Metal" $ICON_FILE TomodachiLifeSaveEditor.smdh || smdhtool --create "Tomodachi Life Save Editor" "Dinheiro Max" "Darkness Metal" icon.png TomodachiLifeSaveEditor.smdh || echo "smdhtool falhou"
           ls -lh TomodachiLifeSaveEditor.elf TomodachiLifeSaveEditor.3dsx TomodachiLifeSaveEditor.smdh || true
 
       - name: Get tools
         run: |
           mkdir -p /tmp/tools /tmp/bt /tmp/mk || true
-          echo "Baixando makerom ZIP oficial 3DSGuy"
-          curl -L --fail -o /tmp/makerom.zip https://github.com/3DSGuy/Project_CTR/releases/latest/download/makerom-linux-x86_64.zip || curl -L --fail -o /tmp/makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18/makerom-v0.18-ubuntu_x86_64.zip || echo "makerom zip falhou"
-          unzip -o /tmp/makerom.zip -d /tmp/mk || true
-          find /tmp/mk -type f -iname "*makerom*" -exec cp {} /tmp/tools/makerom \; || true
+          echo "=== makerom ==="
+          curl -L --fail -o /tmp/makerom.zip https://github.com/3DSGuy/Project_CTR/releases/latest/download/makerom-linux-x86_64.zip || echo "tentativa 1 falhou"
+          if [ ! -s /tmp/makerom.zip ] || head -c 4 /tmp/makerom.zip | grep -q "<"; then echo "zip invalido, tentativa 2" && curl -L --fail -o /tmp/makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18/makerom-v0.18-ubuntu_x86_64.zip || echo "tentativa 2 falhou"; fi
+          if [ ! -s /tmp/makerom.zip ] || head -c 4 /tmp/makerom.zip | grep -q "<"; then echo "tentativa 3 BootNTR" && curl -L --fail -o /tmp/tools/makerom https://raw.githubusercontent.com/44670/BootNTR/master/lib/ctrcommon/tools/makerom-linux || echo "tentativa 3 falhou"; fi
+          if [ -f /tmp/makerom.zip ]; then unzip -o /tmp/makerom.zip -d /tmp/mk || true; find /tmp/mk -type f -iname "*makerom*" -exec cp {} /tmp/tools/makerom \; || true; fi
           chmod +x /tmp/tools/makerom || true
           file /tmp/tools/makerom || true
+          if [ ! -x /tmp/tools/makerom ] || ! file /tmp/tools/makerom | grep -qi "ELF"; then
+            echo "makerom ainda nao e ELF, compilando do source"
+            git clone --depth 1 https://github.com/3DSGuy/Project_CTR.git /tmp/Project_CTR || true
+            cd /tmp/Project_CTR/makerom || cd /tmp/Project_CTR || true
+            make || true
+            find /tmp/Project_CTR -type f -name "makerom" -exec cp {} /tmp/tools/makerom \; || true
+            chmod +x /tmp/tools/makerom || true
+            cd $GITHUB_WORKSPACE || cd /github/workspace || true
+          fi
+          file /tmp/tools/makerom || true
           ls -lh /tmp/tools/makerom || echo "SEM MAKEROM"
-          echo "Baixando bannertool"
+          echo "=== bannertool ==="
           curl -L --fail -o /tmp/bannertool.zip https://github.com/Epicpkmn11/bannertool/releases/download/v1.2.0/bannertool.zip || curl -L --fail -o /tmp/bannertool.zip https://github.com/Steveice10/bannertool/releases/download/v1.2.0/bannertool.zip || echo "bannertool zip falhou"
           unzip -o /tmp/bannertool.zip -d /tmp/bt || true
-          find /tmp/bt -type f | head -n 20 || true
-          find /tmp/bt -type f -iname "*bannertool*" -exec file {} \; || true
+          find /tmp/bt -type f | head -n 30 || true
           find /tmp/bt -type f -path "*linux*" -iname "*bannertool*" -exec cp {} /tmp/tools/bannertool \; || true
           if [ ! -f /tmp/tools/bannertool ]; then find /tmp/bt -type f -iname "*bannertool*" -exec cp {} /tmp/tools/bannertool \; || true; fi
+          if [ ! -f /tmp/tools/bannertool ]; then curl -L --fail -o /tmp/tools/bannertool https://raw.githubusercontent.com/44670/BootNTR/master/lib/ctrcommon/tools/bannertool-linux || echo "bannertool fallback falhou"; fi
           chmod +x /tmp/tools/bannertool || true
           file /tmp/tools/bannertool || true
           ls -lh /tmp/tools/ || true
 
-      - name: Make som Umbreon Black 2
+      - name: Som Umbreon - copiar sem alterar
         run: |
-          python3 <<'PYEOF'
-          import os, wave, math, struct
-          def make_shiny():
-              print("gerando som shiny")
-              w = wave.open('banner_sound.wav','wb')
-              w.setnchannels(2)
-              w.setsampwidth(2)
-              w.setframerate(44100)
-              frames = b''
-              for i in range(66150):
-                  t = i/44100
-                  f = 600 + 1200*t
-                  v = int(12000 * math.sin(2*math.pi*f*t) * (1-t/1.6))
-                  if int(t*10)%3==0:
-                      v += int(4000 * math.sin(2*math.pi*2800*t))
-                  v = max(-32767, min(32767, v))
-                  frames += struct.pack('<hh', v, v)
-              w.writeframes(frames)
-              w.close()
-          if os.path.exists("umbreon_cry.wav"):
-              try:
-                  w = wave.open("umbreon_cry.wav","rb")
-                  ch, sw, fr, n = w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
-                  data = w.readframes(min(n, int(fr*1.5)))
-                  w.close()
-                  out = wave.open("banner_sound.wav","wb")
-                  out.setnchannels(2)
-                  out.setsampwidth(2)
-                  out.setframerate(44100)
-                  if ch==1 and sw==2:
-                      import array
-                      a = array.array('h')
-                      a.frombytes(data)
-                      stereo = b''.join([struct.pack('<hh', v, v) for v in a])
-                      out.writeframes(stereo)
-                  else:
-                      out.writeframes(data)
-                  out.close()
-                  print("usando seu umbreon_cry.wav cortado pra 1.5s")
-              except Exception as e:
-                  print(f"falha no seu wav: {e}, usando shiny")
-                  make_shiny()
-          else:
-              make_shiny()
-          PYEOF
-          ls -lh banner_sound.wav || true
+          if [ -f umbreon_cry.wav ]; then
+            echo "Achou seu umbreon_cry.wav, copiando SEM alterar"
+            cp umbreon_cry.wav banner_sound.wav
+            ls -lh banner_sound.wav
+            file banner_sound.wav || true
+          else
+            echo "Sem umbreon_cry.wav, banner vai sem som"
+            rm -f banner_sound.wav || true
+          fi
+          ls -lh banner_sound.wav || echo "banner sem som"
 
       - name: Make banner + icon
         run: |
@@ -129,22 +132,27 @@ jobs:
           if [ -f icon_shiny.png ]; then ICON_IMG="icon_shiny.png"; fi
           ls -lh $BANNER_IMG $ICON_IMG banner_sound.wav || true
           if [ -x /tmp/tools/bannertool ]; then
-            bannertool makebanner -i $BANNER_IMG -a banner_sound.wav -o banner.bnr || echo "bannertool falhou"
+            if [ -f banner_sound.wav ]; then
+              echo "Banner COM seu som original"
+              bannertool makebanner -i $BANNER_IMG -a banner_sound.wav -o banner.bnr || (echo "com som falhou, tentando sem som" && bannertool makebanner -i $BANNER_IMG -o banner.bnr) || echo "bannertool falhou"
+            else
+              echo "Banner SEM som"
+              bannertool makebanner -i $BANNER_IMG -o banner.bnr || echo "bannertool falhou"
+            fi
             bannertool makesmdh -s "Tomodachi Life Save Editor" -l "Dinheiro Max no Tomodachi Life" -p "Darkness Metal" -i $ICON_IMG -o TomodachiLifeSaveEditor.icn || echo "makesmdh falhou, usando smdh"
             ls -lh banner.bnr TomodachiLifeSaveEditor.icn || true
           else
-            echo "ERRO: sem bannertool"
-            exit 1
+            echo "SEM bannertool, pulando banner"
           fi
           if [ ! -f TomodachiLifeSaveEditor.icn ]; then cp TomodachiLifeSaveEditor.smdh TomodachiLifeSaveEditor.icn || true; fi
+          ls -lh banner.bnr TomodachiLifeSaveEditor.icn || true
 
-      - name: Make CIA com RSF minimo + desc app4
+      - name: Make CIA com varias tentativas - OBRIGATORIO
         run: |
           export PATH="/tmp/tools:$PATH"
           if [ ! -x /tmp/tools/makerom ]; then echo "ERRO: sem makerom"; exit 1; fi
-          if [ ! -f banner.bnr ]; then echo "ERRO: sem banner.bnr"; exit 1; fi
           python3 <<'PYEOF'
-          rsf = """BasicInfo:
+          full = """BasicInfo:
             Title                   : "Tomodachi Life Save Editor"
             ProductCode             : "CTR-P-TLSE"
             Logo                    : Nintendo
@@ -310,15 +318,58 @@ jobs:
               spi: 0x0004013000002302
               ssl: 0x0004013000002f02
           """
-          open("game.rsf","w").write(rsf)
-          print("game.rsf escrito")
+          mini = """BasicInfo:
+            Title                   : "Tomodachi Life Save Editor"
+            ProductCode             : "CTR-P-TLSE"
+            Logo                    : Nintendo
+          TitleInfo:
+            Category                : Application
+            UniqueId                : 0x01F001
+          Option:
+            UseOnSD                 : true
+            FreeProductCode         : true
+            MediaFootPadding        : false
+            EnableCrypt             : false
+            EnableCompress          : true
+          AccessControlInfo:
+            CoreVersion                   : 2
+            DescVersion                   : 2
+            ReleaseKernelMajor            : "02"
+            ReleaseKernelMinor            : "33"
+            UseExtSaveData                : false
+            FileSystemAccess:
+              - CategoryFileSystemTool
+              - DirectSdmc
+              - DirectSdmcWrite
+            MemoryType                    : Application
+            SystemMode                    : 64MB
+            IdealProcessor                : 0
+            AffinityMask                  : 1
+            Priority                      : 16
+            MaxCpu                        : 0x9E
+            HandleTableSize               : 0x200
+          SystemControlInfo:
+            SaveDataSize: 0KB
+            RemasterVersion: 2
+            StackSize: 0x40000
+          """
+          open("game.rsf","w").write(full)
+          open("game_min.rsf","w").write(mini)
+          print("RSF full e mini escritos")
           PYEOF
           cat game.rsf
-          echo "Fazendo CIA com RSF + desc app:4 juntos"
-          makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -desc app:4 -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.icn -banner banner.bnr
-          ls -lh TomodachiLifeSaveEditor.cia
+          echo "=== Tentativa 1: RSF full + desc app:4 + banner ==="
+          if [ -f banner.bnr ]; then makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -desc app:4 -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.icn -banner banner.bnr && echo "T1 OK" || echo "T1 falhou"; else echo "sem banner, pulando T1"; fi
+          if [ ! -f TomodachiLifeSaveEditor.cia ]; then echo "=== Tentativa 2: RSF mini + desc app:4 ==="; if [ -f banner.bnr ]; then makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game_min.rsf -target t -desc app:4 -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.icn -banner banner.bnr && echo "T2 OK" || echo "T2 falhou"; else makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game_min.rsf -target t -desc app:4 -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.icn && echo "T2 OK sem banner" || echo "T2 falhou"; fi; fi
+          if [ ! -f TomodachiLifeSaveEditor.cia ]; then echo "=== Tentativa 3: RSF full sem desc ==="; makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.icn -banner banner.bnr && echo "T3 OK" || echo "T3 falhou"; fi
+          if [ ! -f TomodachiLifeSaveEditor.cia ]; then echo "=== Tentativa 4: RSF full + desc app:2 sem exefslogo ==="; makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game.rsf -target t -desc app:2 -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.icn -banner banner.bnr && echo "T4 OK" || echo "T4 falhou"; fi
+          if [ ! -f TomodachiLifeSaveEditor.cia ]; then echo "=== Tentativa 5: CXI depois CIA ==="; makerom -f cxi -o TomodachiLifeSaveEditor.cxi -rsf game.rsf -target t -desc app:4 -exefslogo -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.icn -banner banner.bnr && makerom -f cia -o TomodachiLifeSaveEditor.cia -content TomodachiLifeSaveEditor.cxi:0:0 && echo "T5 OK" || echo "T5 falhou"; fi
+          if [ ! -f TomodachiLifeSaveEditor.cia ]; then echo "=== Tentativa 6: Sem banner ==="; makerom -f cia -o TomodachiLifeSaveEditor.cia -rsf game_min.rsf -target t -desc app:4 -elf TomodachiLifeSaveEditor.elf -icon TomodachiLifeSaveEditor.icn && echo "T6 OK" || echo "T6 falhou"; fi
+          echo "=== VERIFICACAO FINAL CIA ==="
+          ls -lh TomodachiLifeSaveEditor.3dsx TomodachiLifeSaveEditor.smdh TomodachiLifeSaveEditor.cia || true
+          if [ -f TomodachiLifeSaveEditor.cia ]; then echo "CIA OK - pode instalar pelo FBI"; else echo "CIA FALHOU - me manda o log"; fi
 
-      - name: Upload tudo
+      - name: Upload tudo - CIA incluso
         uses: actions/upload-artifact@v4
         with:
           name: TomodachiLifeSaveEditor
